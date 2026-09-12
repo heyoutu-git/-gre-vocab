@@ -1,0 +1,39 @@
+# ============ 根目录白名单：只提交工程目录 ============
+/*
+!/backend
+!/frontend
+!/docs
+!/.gitignore
+!/README.md
+
+# ============ backend 内部忽略 ============
+# 构建产物
+backend/target/
+# 由前端 vite build 复制生成，不入库（见 README 构建）
+backend/src/main/resources/static/
+backend/src/main/resources/static.bak/
+# 部署脚本（含服务器密码/环境变量，严禁提交）
+backend/deploy-188.bat*
+backend/deploy-dev.bat
+backend/*.log
+backend/Environment
+
+# ============ frontend 内部忽略 ============
+frontend/node_modules/
+frontend/dist*/
+# 构建杂项
+backend/*.txt
+# 大体积离线 TTS 模型（约 150MB），不入库，见 README「模型资源下载」
+frontend/public/kokoro/
+frontend/public/kokoro-ort/
+
+# ============ 通用 ============
+*.p12
+*.keystore
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+.vscode/
+.workbuddy/

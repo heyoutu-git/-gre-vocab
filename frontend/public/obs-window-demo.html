@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OBS 只录 GREStudy 窗口 · 演示</title>
+<style>
+  :root {
+    --obs-bg: #1e1e1e;
+    --obs-panel: #2b2b2b;
+    --obs-line: #3a3a3a;
+    --obs-accent: #6c5ce7;
+    --obs-green: #4caf50;
+    --obs-text: #e6e6e6;
+    --obs-soft: #9a9a9a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0f0f0f;
+    color: var(--obs-text);
+    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 16px;
+  }
+  .stage {
+    width: min(960px, 100%);
+    background: var(--obs-bg);
+    border: 1px solid var(--obs-line);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,.6);
+  }
+  .obs-top {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px; background: #161616; border-bottom: 1px solid var(--obs-line);
+    font-size: 14px; font-weight: 600;
+  }
+  .obs-top .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+  .obs-top .r { background: #ff5f56; } .obs-top .y { background: #ffbd2e; } .obs-top .g { background: #27c93f; }
+  .obs-top .title { margin-left: 8px; color: var(--obs-soft); font-weight: 500; }
+  .obs-body { display: grid; grid-template-columns: 200px 1fr 220px; gap: 1px; background: var(--obs-line); }
+  .col { background: var(--obs-bg); padding: 12px; min-height: 360px; }
+  .col h4 { font-size: 12px; color: var(--obs-soft); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
+  .src-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; border-radius: 6px; font-size: 13px; margin-bottom: 6px;
+    background: var(--obs-panel); border: 1px solid transparent; transition: .3s;
+  }
+  .src-item.active { border-color: var(--obs-accent); background: #2d2a40; }
+  .src-item .ic { width: 16px; text-align: center; }
+  .preview {
+    background: #111; border: 1px dashed var(--obs-line); border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; position: relative;
+    min-height: 336px; overflow: hidden;
+  }
+  .gre-mock {
+    width: 78%; background: #fff; border-radius: 10px; padding: 14px; color: #222;
+    box-shadow: 0 8px 24px rgba(0,0,0,.5); transition: .4s; transform: translateY(0);
+  }
+  .gre-mock .bar { height: 26px; background: linear-gradient(90deg,#6c5ce7,#a29bfe); border-radius: 6px; margin-bottom: 10px; }
+  .gre-mock .row { height: 10px; background: #e3e3ee; border-radius: 4px; margin: 7px 0; }
+  .gre-mock .row.hl { background: #ffe08a; }
+  .gre-mock .play { margin-top: 12px; display: inline-flex; align-items: center; gap: 6px;
+    background: #6c5ce7; color: #fff; padding: 6px 12px; border-radius: 20px; font-size: 12px; }
+  .desktop-dim {
+    position: absolute; inset: 0; background: rgba(0,0,0,.0); transition: .4s;
+    display: flex; align-items: center; justify-content: center; pointer-events: none;
+  }
+  .desktop-dim .label {
+    background: rgba(0,0,0,.55); color: #ccc; padding: 6px 12px; border-radius: 6px; font-size: 12px;
+    opacity: 0; transition: .4s;
+  }
+  .mixer .chan { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 12px; }
+  .mixer .lvl { flex: 1; height: 8px; background: #333; border-radius: 4px; overflow: hidden; }
+  .mixer .lvl i { display: block; height: 100%; width: 0%; background: var(--obs-green); transition: width .15s; }
+  .rec-btn {
+    width: 100%; padding: 10px; border: none; border-radius: 6px; cursor: pointer;
+    background: var(--obs-green); color: #fff; font-weight: 600; font-size: 13px;
+  }
+  .caption {
+    padding: 14px 18px; background: #161616; border-top: 1px solid var(--obs-line);
+    font-size: 14px; line-height: 1.6; min-height: 56px;
+  }
+  .caption b { color: var(--obs-accent); }
+  .dots { display: flex; gap: 8px; justify-content: center; padding: 12px; background: #161616; }
+  .dots button { width: 9px; height: 9px; border-radius: 50%; border: none; background: #444; cursor: pointer; padding: 0; }
+  .dots button.on { background: var(--obs-accent); transform: scale(1.25); }
+  .badge { position: absolute; top: 10px; left: 10px; background: rgba(108,92,231,.9); color:#fff;
+    font-size: 11px; padding: 3px 8px; border-radius: 4px; }
+  .note { text-align:center; color: var(--obs-soft); font-size: 12px; padding: 0 0 16px; background:#161616;}
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="obs-top">
+      <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+      <span class="title">OBS Studio — 仅录 GREStudy 窗口演示</span>
+    </div>
+    <div class="obs-body">
+      <!-- 来源 -->
+      <div class="col">
+        <h4>来源</h4>
+        <div class="src-item" data-step="s0"><span class="ic">＋</span> 显示器捕获</div>
+        <div class="src-item" data-step="s1"><span class="ic">＋</span> 窗口捕获</div>
+        <div class="src-item" data-step="s2"><span class="ic">▣</span> Chrome — GREStudy</div>
+        <div class="src-item" data-step="s3"><span class="ic">♪</span> 桌面音频</div>
+      </div>
+      <!-- 预览 -->
+      <div class="col preview">
+        <div class="badge" id="badge">整屏预览</div>
+        <div class="gre-mock" id="gre">
+          <div class="bar"></div>
+          <div class="row"></div>
+          <div class="row hl"></div>
+          <div class="row"></div>
+          <div class="play">🔊 跟读本页</div>
+        </div>
+        <div class="desktop-dim" id="dim"><span class="label" id="dimLabel">其它桌面内容 · 不会被录进去</span></div>
+      </div>
+      <!-- 混音器 -->
+      <div class="col mixer">
+        <h4>混音器</h4>
+        <div class="chan">桌面音频 <div class="lvl"><i id="lvl"></i></div></div>
+        <div class="chan">麦克风 <div class="lvl"><i style="width:0"></i></div></div>
+        <button class="rec-btn" id="recBtn">● 开始录制</button>
+      </div>
+    </div>
+    <div class="caption" id="cap"></div>
+    <div class="dots" id="dots"></div>
+    <div class="note">演示为示意图，真实 OBS 界面以你本地为准 · 关键在「窗口捕获」只选 GREStudy 那一个窗口</div>
+  </div>
+
+<script>
+  const steps = [
+    { src:'s1', cap:'<b>第 1 步：</b>在「来源」点 <b>＋ → 窗口捕获</b>，新建一个来源（比「显示器捕获」更干净）。', badge:'来源配置', dim:false, dimLabel:'', lvl:0, rec:false },
+    { src:'s2', cap:'<b>第 2 步：</b>在弹出的窗口列表里选 <b>Chrome — GREStudy</b>（即打开 GREStudy 的浏览器窗口）。', badge:'选择窗口', dim:false, dimLabel:'', lvl:0, rec:false },
+    { src:'s3', cap:'<b>第 3 步：</b>窗口捕获会<b>直接抓取该窗口画面</b>——即使它被别的窗口挡住，也只录 GREStudy，不录桌面。', badge:'只框定一个窗口', dim:true, dimLabel:'其它桌面内容 · 不会被录进去', lvl:0, rec:false },
+    { src:'s3', cap:'<b>第 4 步：</b>确认「混音器 → 桌面音频」能录到声音，在 GREStudy 点一次 <b>🔊 跟读本页</b> 试听，电平条跳动即正常。', badge:'声音已接入', dim:true, dimLabel:'其它桌面内容 · 不会被录进去', lvl:80, rec:false },
+    { src:'s3', cap:'<b>第 5 步：</b>在 GREStudy 点 <b>🔊 跟读本页</b> 开始朗读，同时在 OBS 点 <b>开始录制</b>。', badge:'录制中', dim:true, dimLabel:'其它桌面内容 · 不会被录进去', lvl:90, rec:true },
+    { src:'s3', cap:'<b>完成：</b>录完先停 GREStudy 朗读，再停 OBS。产出的是<b>只含 GREStudy 画面 + 朗读语音</b>的 MP4，无桌面杂讯。', badge:'已生成 MP4', dim:true, dimLabel:'其它桌面内容 · 不会被录进去', lvl:0, rec:false },
+  ];
+  let i = 0, timer = null;
+  const $ = s => document.querySelector(s);
+  const cap = $('#cap'), badge = $('#badge'), dim = $('#dim'), dimLabel = $('#dimLabel'),
+        lvl = $('#lvl'), recBtn = $('#recBtn'), gre = $('#gre');
+
+  // dots
+  const dotsWrap = $('#dots');
+  steps.forEach((_,k)=>{ const b=document.createElement('button'); b.onclick=()=>go(k); dotsWrap.appendChild(b); });
+
+  function render(){
+    const s = steps[i];
+    document.querySelectorAll('.src-item').forEach(el=> el.classList.toggle('active', el.dataset.step===s.src));
+    cap.innerHTML = s.cap;
+    badge.textContent = s.badge;
+    dim.style.background = s.dim ? 'rgba(0,0,0,.72)' : 'rgba(0,0,0,0)';
+    dimLabel.style.opacity = s.dim ? '1' : '0';
+    lvl.style.width = s.lvl + '%';
+    recBtn.textContent = s.rec ? '■ 录制中…' : '● 开始录制';
+    recBtn.style.background = s.rec ? '#e74c3c' : '#4caf50';
+    document.querySelectorAll('#dots button').forEach((b,k)=> b.classList.toggle('on', k===i));
+  }
+  function go(k){ i = (k+steps.length)%steps.length; render(); restart(); }
+  function restart(){ clearInterval(timer); timer = setInterval(()=> go(i+1), 3000); }
+  render(); restart();
+
+  // 点击画面暂停/继续
+  document.querySelector('.preview').addEventListener('click', ()=>{
+    if(timer){ clearInterval(timer); timer=null; } else restart();
+  });
+</script>
+</body>
+</html>

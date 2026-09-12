@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Kokoro 推理链路测试</title>
+<style>
+  body { font-family: monospace; padding: 16px; background: #111; color: #0f0; font-size: 13px; }
+  #log { white-space: pre-wrap; }
+  .err { color: #f55; }
+  .ok { color: #5f5; font-weight: bold; }
+</style>
+</head>
+<body>
+<div id="log">starting...</div>
+<script type="module">
+const logEl = document.getElementById('log')
+const lines = []
+function log(s) {
+  lines.push(s)
+  logEl.innerHTML = lines.map(l => `<div class="${l.startsWith('ERR') ? 'err' : (l.startsWith('SUCCESS') ? 'ok' : '')}">${l}</div>`).join('')
+}
+const BASE = '/gre-vocab/'
+log('page loaded, mode=' + (location.port === '5173' ? 'dev' : 'dist'))
+try {
+  let hf, KokoroTTS
+  if (location.port === '5173') {
+    // dev：bare import 由 vite 解析
+    hf = await import('@huggingface/transformers')
+    const k = await import('kokoro-js')
+    KokoroTTS = k.KokoroTTS
+  } else {
+    // dist/preview/生产：从构建产物 chunk 动态发现并 import
+    const idx = await (await fetch(BASE)).text()
+    const entrySrc = idx.match(/src="([^"]+index-[^"]+\.js)"/)
+    if (!entrySrc) throw new Error('entry chunk not found in index.html')
+    const entryUrl = new URL(entrySrc[1], location.href)
+    const entryCode = await (await fetch(entryUrl)).text()
+    const kokoroChunk = entryCode.match(/(?:assets\/)?(kokoro-[A-Za-z0-9_-]+\.js)/)
+    const trChunk = entryCode.match(/(?:assets\/)?(transformers[^\/"]*?[A-Za-z0-9_-]+\.js)/)
+    if (!kokoroChunk) throw new Error('kokoro chunk not found in entry')
+    log('found chunks: ' + (kokoroChunk[1] || '') + ' | ' + (trChunk ? trChunk[1] : 'transformers-not-found'))
+    if (trChunk) hf = await import(new URL(trChunk[1], entryUrl).href)
+    const kMod = await import(new URL(kokoroChunk[1], entryUrl).href)
+    KokoroTTS = kMod.KokoroTTS || (kMod.default && kMod.default.KokoroTTS)
+    if (!hf || !KokoroTTS) throw new Error('hf=' + !!hf + ' KokoroTTS=' + !!KokoroTTS)
+  }
+
+  // 与修复后的 tts.js 相同的环境设置（transformers v3 API）
+  const wasmCfg = (hf.env.backends && hf.env.backends.onnx) ? hf.env.backends.onnx.wasm : hf.env.wasm
+  wasmCfg.wasmPaths = BASE + 'kokoro-ort/'
+  hf.env.allowLocalModels = true
+  hf.env.allowRemoteModels = false
+  log('env set: wasmPaths=' + wasmCfg.wasmPaths)
+
+  // voices fetch 重定向（与 tts.js 相同）
+  const orig = window.fetch.bind(window)
+  window.fetch = function (input, init) {
+    const url = typeof input === 'string' ? input : (input && input.url) || ''
+    const m = url.match(/huggingface\.co\/onnx-community\/Kokoro-82M-v1\.0-ONNX\/resolve\/main\/voices\/([^?]+)/)
+    if (m) return orig(BASE + 'kokoro/Kokoro-82M-v1.0-ONNX/voices/' + m[1], init)
+    return orig(input, init)
+  }
+
+  log('loading model (q8/wasm)...')
+  const t0 = performance.now()
+  const tts = await KokoroTTS.from_pretrained(BASE + 'kokoro/Kokoro-82M-v1.0-ONNX', {
+    dtype: 'q8', device: 'wasm',
+    progress_callback: (p) => {
+      if (p.status === 'progress' && p.file && p.file.includes('.onnx')) {
+        logEl.lastChild && (logEl.lastChild.textContent = `model download ${Math.round(p.progress || 0)}%`)
+      }
+    }
+  })
+  log('model loaded in ' + Math.round(performance.now() - t0) + 'ms, crossOriginIsolated=' + window.crossOriginIsolated)
+
+  const t1 = performance.now()
+  const out = await tts.generate('Hello world, this is a kokoro test.', { voice: 'af_heart' })
+  log('generate done in ' + Math.round(performance.now() - t1) + 'ms, rate=' + out.sampling_rate + ', samples=' + out.audio.length)
+
+  const wavBlob = new Blob([out.toWav()], { type: 'audio/wav' })
+  const url = URL.createObjectURL(wavBlob)
+  const a = new Audio(url)
+  const btn = document.createElement('button')
+  btn.textContent = '▶ Play result'
+  btn.onclick = () => a.play()
+  document.body.appendChild(btn)
+  try { await a.play(); log('auto-play started') } catch (e) { log('auto-play blocked, click button: ' + e.message) }
+  log('SUCCESS kokoro pipeline works')
+} catch (e) {
+  log('ERR ' + (e && (e.message || e)))
+  if (e && e.stack) log('ERRSTACK ' + String(e.stack).slice(0, 400))
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,153 @@
+:root {
+  --gre-primary: #4f6df5;
+  --gre-primary-soft: #eef1fe;
+  --gre-bg: #f5f7fa;
+  --gre-surface: #ffffff;
+  --gre-text: #1f2d3d;
+  --gre-text-soft: #5b6b7f;
+  --gre-border: #e6e9ef;
+  --gre-sidebar-bg: #1f2d3d;
+  --gre-sidebar-text: #cdd6e0;
+  --gre-sidebar-active: #4f6df5;
+  --gre-sidebar-border: rgba(255, 255, 255, 0.12);
+  /* 整体字号缩放系数：默认 1；小屏自动变小 */
+  --gre-fs-scale: 1;
+  /* 按钮缩放系数：小屏更小 */
+  --gre-btn-scale: 1;
+}
+:root[data-theme="dark"] {
+  --gre-bg: #14181f;
+  --gre-surface: #1e242e;
+  --gre-text: #e6ebf2;
+  --gre-text-soft: #9aa7b8;
+  --gre-border: #2c3542;
+  --gre-sidebar-bg: #161b22;
+  --gre-sidebar-text: #cdd6e0;
+  --gre-sidebar-active: #4f6df5;
+  --gre-sidebar-border: rgba(255, 255, 255, 0.08);
+  --gre-primary-soft: rgba(79,109,245,.22);
+}
+* { box-sizing: border-box; }
+html, body, #app { height: 100%; margin: 0; }
+body {
+  font-family: "PingFang SC", "Microsoft YaHei", -apple-system, sans-serif;
+  color: var(--gre-text);
+  background: var(--gre-bg);
+}
+.gre-link { color: var(--gre-primary); cursor: pointer; }
+.gre-link:hover { text-decoration: underline; }
+
+/* ===== 响应式整体字号缩放 ===== */
+/* 笔记本/中屏：略缩 */
+@media (max-width: 1200px) {
+  :root { --gre-fs-scale: 0.92; }
+}
+/* 手机：字体整体缩小（用户要求“手机字体小一些”） */
+@media (max-width: 768px) {
+  :root { --gre-fs-scale: 0.72; --gre-btn-scale: 0.82; --el-font-size-base: 12px; }
+}
+html { font-size: calc(16px * var(--gre-fs-scale)); }
+
+/* Element Plus 侧栏菜单统一使用全局字号 */
+.el-menu--vertical .el-menu-item,
+.el-menu--vertical .el-sub-menu__title { font-size: calc(var(--el-font-size-base, 14px) * 1.08); }
+
+/* 手机端按钮更小（用户要求“按钮也小一些”） */
+@media (max-width: 768px) {
+  .el-button { padding: 5px 10px; font-size: calc(13px * var(--gre-btn-scale)); }
+  .el-button--small { padding: 3px 8px; }
+  .el-input__inner, .el-textarea__inner { font-size: 13px; }
+}
+
+/* 词汇卡片 */
+.vocab-card {
+  background: var(--gre-surface);
+  border: 1px solid var(--gre-border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  transition: border-color .2s ease, background .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+/* 跟读时当前词条高亮跟踪 */
+.vocab-card.active {
+  border-color: var(--gre-primary);
+  background: var(--gre-primary-soft);
+  box-shadow: 0 2px 12px rgba(79,109,245,.20);
+  transform: translateY(-1px);
+}
+.vocab-card.active .vocab-word { color: var(--gre-primary); }
+.vocab-word { font-size: 1.5rem; font-weight: 700; color: var(--gre-text); letter-spacing: .3px; }
+.vocab-phon { color: var(--gre-text-soft); margin-left: 10px; font-style: italic; }
+.vocab-pos { display: inline-block; background: var(--gre-primary-soft); color: var(--gre-primary);
+  border-radius: 6px; padding: 1px 8px; font-size: .8rem; margin-left: 8px; font-weight: 600; }
+.vocab-inflect { color: var(--gre-text-soft); font-size: .82rem; margin-left: 8px; }
+.vocab-def { margin-top: 6px; color: var(--gre-text); line-height: 1.6; }
+.vocab-ex { margin-top: 6px; color: var(--gre-text-soft); line-height: 1.6; border-left: 3px solid var(--gre-border); padding-left: 10px; font-style: italic; }
+.vocab-actions { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* 课时卡片 */
+.lesson-card { cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
+.lesson-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(79,109,245,.12); }
+
+/* 小屏：卡片内边距收紧，避免竖屏下信息挤成一团 */
+@media (max-width: 768px) {
+  .el-main { padding: 12px !important; }
+
+  .vocab-card {
+    padding: 10px 12px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+  }
+
+  /* 单词信息分行展示，避免长标题+音标+词性在一行堆叠折行 */
+  .vocab-word {
+    display: block;
+    font-size: 1.15rem;
+    line-height: 1.3;
+  }
+  .vocab-phon {
+    display: block;
+    margin-left: 0;
+    margin-top: 2px;
+    font-size: .85rem;
+  }
+  .vocab-pos {
+    margin-left: 0;
+    margin-top: 4px;
+    font-size: .7rem;
+    padding: 1px 6px;
+  }
+  .vocab-inflect {
+    display: block;
+    margin-left: 0;
+    margin-top: 2px;
+    font-size: .75rem;
+  }
+
+  .vocab-def {
+    font-size: .95rem;
+    margin-top: 6px;
+    line-height: 1.5;
+  }
+  .vocab-ex {
+    font-size: .85rem;
+    margin-top: 4px;
+    padding-left: 8px;
+  }
+
+  /* 操作按钮更紧凑，但仍可折行 */
+  .vocab-actions {
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .vocab-actions .el-button {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+  .vocab-actions .el-button.el-button--text,
+  .vocab-actions .el-button.is-text {
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+  }
+}
