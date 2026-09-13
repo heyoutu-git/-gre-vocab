@@ -1,16 +1,20 @@
 <template>
-  <div class="detail reading" v-loading="loading">
+  <div class="detail reading" v-loading="loading" ref="rootEl">
     <div class="topbar">
       <div class="bar">
         <div>
-          <el-button text @click="goBackLessons">← 课时目录</el-button>
+          <el-button text @click="goBackLessons">{{ $t('lesson.back') }}</el-button>
           <h2 style="display:inline; margin-left:8px;">{{ title }}</h2>
+          <span v-if="prevLesson || nextLesson" class="lesson-nav-top">
+            <el-button v-if="prevLesson" size="small" @click="goNavLesson(prevLesson)">{{ $t('lesson.prevLesson') }}</el-button>
+            <el-button v-if="nextLesson" size="small" type="primary" @click="goNavLesson(nextLesson)">{{ $t('lesson.nextLesson') }}</el-button>
+          </span>
         </div>
         <div class="tools">
           <el-button :type="showZh ? 'primary' : 'default'" @click="showZh = !showZh" :disabled="ttsState.active || !zhReady">
-            {{ showZh ? '隐藏中文' : '显示中文' }}
+            {{ showZh ? $t('mobile.hideZh') : $t('mobile.showZh') }}
           </el-button>
-          <el-button @click="speakReading" :disabled="!supported || ttsState.active || !enSentences.length">🔊 跟读全文</el-button>
+          <el-button @click="speakReading" :disabled="!supported || ttsState.active || !enSentences.length">{{ $t('mobile.speakAll') }}</el-button>
           <el-select v-model="engineSel" style="width: 120px" :disabled="ttsState.active" :title="$t('lesson.engine')" @change="onEngineChange">
             <el-option v-for="e in engineList" :key="e.code" :label="e.name" :value="e.code" />
           </el-select>
@@ -35,9 +39,9 @@
       :title="$t('lesson.kokoroTip', { pct: kokoroPct })" />
 
     <el-alert v-if="!supported" type="warning" :closable="false" style="margin-bottom:12px"
-      title="当前浏览器不支持语音朗读（SpeechSynthesis），请使用 Chrome / Edge / Safari。" />
+      :title="$t('lesson.noSupport')" />
 
-    <el-empty v-if="!loading && !enSentences.length" description="暂无阅读内容" />
+    <el-empty v-if="!loading && !enSentences.length" :description="$t('lesson.noReading')" />
 
     <div v-else class="reading-body" :class="{ 'with-zh': showZh }">
       <div
@@ -63,10 +67,12 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { lessonApi, learningApi } from '../api'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '../store/user'
+import { createScrollTracker } from '../utils/scroll-track'
+import { useProgressReport, checkLessonResume } from '../composables/useProgressReport'
 import {
   speechSupported,
   onTTSState,
@@ -126,13 +132,13 @@ watch(loopMode, (mode) => {
 
 // 发音引擎选择器（自动 / system / mespeak / tencent / kokoro；Kokoro 优先排前）
 const engineSel = ref(getEngine())
-const engineList = ref([{ code: 'auto', name: '自动' }])
+const engineList = ref([{ code: 'auto', name: t('lesson.auto') }])
 function buildEngineList() {
   const rest = getAvailableEngines()
     .slice()
     .sort((a, b) => (a.code === 'kokoro' ? -1 : b.code === 'kokoro' ? 1 : 0))
     .map((e) => ({ code: e.code, name: e.name }))
-  engineList.value = [{ code: 'auto', name: '自动' }, ...rest]
+  engineList.value = [{ code: 'auto', name: t('lesson.auto') }, ...rest]
 }
 function onEngineChange() { setEngine(engineSel.value) }
 
@@ -140,6 +146,8 @@ const loading = ref(false)
 const supported = speechSupported()
 const ttsState = ref({ active: false, paused: false, index: -1, total: 0, track: false })
 onTTSState((s) => { ttsState.value = s })
+// ---- 学习进度自动上报（10s 节流，跨端存服务端）----
+const { flush: flushProgress } = useProgressReport(() => props.lessonId, ttsState)
 
 // Kokoro 语音包加载进度提示（首次 92MB 下载 + wasm 推理需要等待，给用户明确反馈）
 const kokoroLoading = ref(false)
@@ -272,45 +280,60 @@ function speakReading() {
   playItems(items, { totalWords: list.length, track: true, speakMode: 'reading' })
 }
 
-// ---- 自动滚屏：记录每句 DOM，当前句变化时把句子顶部对齐到 topbar 下方 ----
+// 从第 n 句续播（「继续上次学习」）
+function speakReadingFrom(n) {
+  const list = rows.value.map((r) => r.en).filter(Boolean)
+  if (!list.length) return
+  const items = list.map((s, i) => ({ text: s, wordIndex: i }))
+  const start = Math.min(Math.max(n, 0), items.length - 1)
+  playItems(items, { totalWords: list.length, track: true, speakMode: 'reading', startIndex: start })
+}
+
+// 进入页面/换课时：有历史位置且未完成 → 提示继续
+async function promptResume(lid) {
+  const n = await checkLessonResume(() => lid, userStore)
+  if (!n) return
+  ElMessageBox.confirm(t('lesson.resumeBody', { n }), t('lesson.resumeTitle'), {
+    confirmButtonText: t('lesson.resumeYes'),
+    cancelButtonText: t('lesson.resumeNo'),
+    type: 'info'
+  }).then(() => speakReadingFrom(n)).catch(() => {})
+}
+
+// ---- 自动滚屏：记录每句 DOM，当前句变化时把句子垂直居中显示（超长句顶部对齐） ----
 const autoScroll = ref(true)
+const rootEl = ref(null)
 const enEls = {}
+const tracker = createScrollTracker()
 function setEnRef(i, el) {
   if (el) enEls[i] = el
   else delete enEls[i]
 }
-function scrollToCurrent(force = false) {
-  if (!ttsState.value.active || !ttsState.value.track || !autoScroll.value) return
+function scrollToCurrent() {
+  if (!ttsState.value.active || !ttsState.value.track || !autoScroll.value) { tracker.stop(); return }
   const idx = ttsState.value.index
   if (idx < 0) return
-  const el = enEls[idx]
-  if (!el || typeof el.scrollIntoView !== 'function') return
-  const topbar = document.querySelector('.topbar')
-  const topbarBottom = topbar ? topbar.getBoundingClientRect().bottom : 120
-  const viewportH = window.innerHeight
-  const rect = el.getBoundingClientRect()
-  const margin = 20
-  const visibleTop = topbarBottom + margin
-  const visibleBottom = viewportH - margin
-  // 非强制调用（如 resize）时，若当前句已在合理可视区内则不跳，避免频繁跳动
-  if (!force && rect.top >= visibleTop && rect.bottom <= visibleBottom) return
-  // 把句子顶部固定对齐到 topbar 下方 20px，确保长句从头可见，不会滚过顶
-  const targetY = window.scrollY + rect.top - visibleTop
-  window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' })
+  const headerEl = rootEl.value ? rootEl.value.querySelector('.topbar') : null
+  tracker.ensureVisible(enEls[idx], headerEl, {
+    isActive: () => ttsState.value.active && ttsState.value.track && autoScroll.value
+  })
 }
 watch(
   () => [ttsState.value.active, ttsState.value.index, ttsState.value.track],
-  () => nextTick(() => scrollToCurrent(true))
+  () => nextTick(scrollToCurrent)
 )
+watch(autoScroll, (on) => { if (!on) tracker.stop() })
 
 // 屏幕尺寸变化（横竖屏切换 / 窗口缩放）后，若高亮句被遮挡再滚回可视区
 let resizeTimer = null
 function onResize() {
   clearTimeout(resizeTimer)
   // 延时稍长，等 Element Plus 按钮组换行/重排完成
-  resizeTimer = setTimeout(() => nextTick(() => scrollToCurrent(false)), 250)
+  resizeTimer = setTimeout(() => nextTick(scrollToCurrent), 250)
 }
 onMounted(() => {
+  // 清掉上个页面残留的播放会话（如 A 页暂停后切到本页），避免「继续」播到别页内容
+  if (ttsState.value.active) stopTTS()
   window.addEventListener('resize', onResize)
   window.addEventListener('orientationchange', onResize)
   buildEngineList()
@@ -319,11 +342,15 @@ onMounted(() => {
   window.addEventListener('kokoro-progress', onKokoroProgress)
 })
 onUnmounted(() => {
+  // 播放中/暂停中离开页面一律终止会话，防止串台
+  stopTTS()
+  flushProgress()
   window.removeEventListener('resize', onResize)
   window.removeEventListener('orientationchange', onResize)
   window.removeEventListener('gre-engines-updated', buildEngineList)
   window.removeEventListener('kokoro-progress', onKokoroProgress)
   clearTimeout(resizeTimer)
+  tracker.stop()
 })
 
 function togglePause() {
@@ -337,7 +364,7 @@ async function loadPassage(lid) {
     const { data } = await lessonApi.passage(lid)
     passage.value = data
   } catch (e) {
-    ElMessage.error('阅读内容加载失败，请确认已登录')
+    ElMessage.error(t('lesson.readLoadFail'))
   } finally {
     loading.value = false
   }
@@ -345,7 +372,9 @@ async function loadPassage(lid) {
 
 onMounted(async () => {
   await loadPassage(props.lessonId)
+  promptResume(props.lessonId)
   refreshDone()
+  loadBookLessons()
   // 本书循环跨课自动播放：阅读书自己消费续播标记
   consumePendingAutoPlay(props.lessonId)
 })
@@ -353,8 +382,44 @@ onMounted(async () => {
 watch(() => props.lessonId, async (newId) => {
   await loadPassage(newId)
   refreshDone()
+  promptResume(newId)
+  loadBookLessons()
   consumePendingAutoPlay(newId)
 })
+
+// ---- 上一课 / 下一课导航（顶栏悬浮；按本书课时列表顺序，首课无上一课、末课无下一课） ----
+const bookLessons = ref([])
+let bookLessonsBookId = null
+async function loadBookLessons() {
+  const bid = props.bookId
+  if (!bid) return
+  if (bookLessonsBookId === bid && bookLessons.value.length) return
+  try {
+    const { data: ls } = await lessonApi.list(bid)
+    bookLessons.value = ls || []
+    bookLessonsBookId = bid
+  } catch (e) { /* ignore */ }
+}
+function navNeighbor(offset) {
+  const ls = bookLessons.value
+  const idx = ls.findIndex((l) => String(l.id) === String(props.lessonId))
+  if (idx < 0) return null
+  return ls[idx + offset] || null
+}
+const prevLesson = computed(() => navNeighbor(-1))
+const nextLesson = computed(() => navNeighbor(1))
+function goNavLesson(l) {
+  stopTTS()
+  // 清掉可能的跨课续播标记，避免误触发自动播放
+  try { sessionStorage.removeItem('gre-book-loop') } catch (e) { /* ignore */ }
+  router.push(`/lessons/${l.id}`)
+  // 换课后回到页面顶部
+  nextTick(() => {
+    const main = document.querySelector('.el-main')
+    if (main) main.scrollTop = 0
+    window.scrollTo(0, 0)
+  })
+}
 
 function consumePendingAutoPlay(lid) {
   try {
@@ -371,7 +436,9 @@ function consumePendingAutoPlay(lid) {
 <style scoped>
 .topbar {
   position: sticky;
-  top: 0;
+  /* 吸顶点用负值抵消负 margin：sticky 的 top 按外边距盒对齐，
+     top:0 会让边框盒停在 18px 下方，滑动文字会从空隙穿出 */
+  top: -18px;
   z-index: 20;
   margin: -18px -18px 14px;
   padding: 14px 18px 0;
@@ -381,6 +448,7 @@ function consumePendingAutoPlay(lid) {
 }
 .bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
 .done-row { margin-top: 18px; text-align: center; }
+.lesson-nav-top { display: inline-flex; gap: 6px; margin-left: 10px; vertical-align: middle; }
 .tools { display: flex; gap: 8px; flex-wrap: wrap; }
 .tts-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; padding: 8px 12px; background: var(--gre-surface); border: 1px solid var(--gre-border); border-radius: 8px; }
 .auto-scroll-toggle { margin-right: 4px; }
@@ -393,7 +461,7 @@ function consumePendingAutoPlay(lid) {
 .para .zh { margin: 8px 0 0; color: var(--gre-text-soft); text-align: justify; font-size: 15px; }
 
 @media (max-width: 768px) {
-  .topbar { margin: -12px -12px 10px; padding: 10px 12px 0; }
+  .topbar { margin: -12px -12px 10px; padding: 10px 12px 0; top: -12px; }
   .reading-body { font-size: 15px; }
 }
 </style>

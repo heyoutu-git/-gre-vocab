@@ -1,51 +1,23 @@
 <template>
-  <div class="m-detail">
-    <div class="topbar">
+  <div class="m-detail" ref="rootEl">
+    <div class="head">
+    <div class="title-row">
+      <van-icon name="arrow-left" class="sbtn" @click="goBack" />
       <div class="title">{{ lesson?.title || $t('lessons.lessons') }}</div>
-      <van-icon name="arrow-left" class="back" @click="goBack" />
+      <van-icon v-if="bookType == null || bookType !== 2" name="setting-o" class="sbtn" @click="showSettings = true" />
     </div>
 
-    <ReadingView v-if="bookType === 2" :lesson-id="route.params.id" :title="lesson?.title || ''" :book-id="lesson?.bookId" />
-
-    <template v-else-if="bookType != null">
-    <div class="toolbar">
-      <van-field
-        v-model="engineLabel"
-        readonly
-        is-link
-        :label="$t('lesson.engine')"
-        class="engine-field"
-        @click="showEngine = true"
-      />
-      <van-popup v-model:show="showEngine" position="bottom" round>
-        <van-picker
-          :columns="engineColumns"
-          @confirm="onEnginePick"
-          @cancel="showEngine = false"
-          show-toolbar
-          :title="$t('lesson.engine')"
-        />
-      </van-popup>
-
-      <div class="actions">
-        <van-button size="small" type="primary" :disabled="!supported || ttsState.active" @click="playWords">{{ $t('lesson.speakWords') }}</van-button>
-        <van-button size="small" :disabled="!supported || ttsState.active" @click="playAll">{{ $t('lesson.speakPage') }}</van-button>
-      </div>
-      <div class="actions">
-        <van-button size="small" :type="hideKnown ? 'primary' : 'default'" :disabled="ttsState.active" @click="hideKnown = !hideKnown">
-          {{ hideKnown ? $t('lesson.showAll') : $t('lesson.hideKnown') }}
-        </van-button>
-        <van-button size="small" :type="autoScroll ? 'primary' : 'default'" @click="autoScroll = !autoScroll">{{ $t('lesson.autoScroll') }}</van-button>
-      </div>
-      <div class="actions">
-        <van-button size="small" :type="lessonDone ? 'success' : 'default'" :icon="lessonDone ? 'success' : ''" :disabled="!isLogin || lessonDone" @click="markDone">
-          {{ lessonDone ? $t('lesson.done') : $t('lesson.markDone') }}
-        </van-button>
-      </div>
-      <div class="actions">
-        <van-button size="small" v-for="m in loopOptions" :key="m.value"
-          :type="loopMode === m.value ? 'primary' : 'default'" @click="loopMode = m.value">{{ m.label }}</van-button>
-      </div>
+    <template v-if="bookType != null && bookType !== 2">
+    <div class="chipbar">
+      <span class="sq-btn" :class="{ disabled: !prevLesson }" @click="prevLesson && goNavLesson(prevLesson)">
+        <van-icon name="arrow-left" />
+      </span>
+      <span class="sq-btn" :class="{ disabled: !nextLesson }" @click="nextLesson && goNavLesson(nextLesson)">
+        <van-icon name="arrow" />
+      </span>
+      <span class="chip" :class="{ on: autoScroll }" @click="autoScroll = !autoScroll">{{ $t('lesson.autoScroll') }}</span>
+      <span class="chip" @click="showLoop = true">{{ loopLabel }} ▾</span>
+      <van-button size="small" type="primary" class="play-btn" :disabled="!supported || ttsState.active" @click="playWords">{{ $t('lesson.speakWords') }}</van-button>
     </div>
 
     <div v-if="ttsState.active" class="tts-bar">
@@ -55,7 +27,13 @@
         <van-button size="small" @click="restartTTS">↺</van-button>
         <van-button size="small" @click="stopTTS">⏹</van-button>
       </div>
+      </div>
+    </template>
     </div>
+
+    <ReadingView v-if="bookType === 2" :lesson-id="route.params.id" :title="lesson?.title || ''" :book-id="lesson?.bookId" :prev="prevLesson" :next="nextLesson" @nav="goNavLesson" />
+
+    <template v-else-if="bookType != null">
     <van-notice-bar v-if="kokoroLoading" wrapable :scrollable="false" class="kokoro-tip"
       :text="$t('lesson.kokoroTip', { pct: kokoroPct })" />
 
@@ -92,6 +70,52 @@
     <van-notice-bar v-if="!supported" :text="$t('lesson.noSupportShort')" />
     </template>
     <van-loading v-else class="center" />
+
+    <!-- 设置弹层（低频操作收纳）：发音引擎 / 跟读全文 / 隐藏已掌握 / 完成本课 -->
+    <van-popup v-model:show="showSettings" position="bottom" round class="settings-sheet">
+      <div class="sheet-title">{{ $t('lesson.settings') }}</div>
+      <van-field
+        v-model="engineLabel"
+        readonly
+        is-link
+        :label="$t('lesson.engine')"
+        class="engine-field"
+        @click="showEngine = true"
+      />
+      <div class="sheet-row">
+        <van-button size="small" block :disabled="!supported || ttsState.active" @click="playAll">{{ $t('lesson.speakPage') }}</van-button>
+        <van-button size="small" block :type="hideKnown ? 'primary' : 'default'" :disabled="ttsState.active" @click="hideKnown = !hideKnown">
+          {{ hideKnown ? $t('lesson.showAll') : $t('lesson.hideKnown') }}
+        </van-button>
+      </div>
+      <div class="sheet-row">
+        <van-button size="small" block :type="lessonDone ? 'success' : 'default'" :icon="lessonDone ? 'success' : ''" :disabled="!isLogin || lessonDone" @click="markDone">
+          {{ lessonDone ? $t('lesson.done') : $t('lesson.markDone') }}
+        </van-button>
+      </div>
+    </van-popup>
+
+    <!-- 发音引擎选择 -->
+    <van-popup v-model:show="showEngine" position="bottom" round>
+      <van-picker
+        :columns="engineColumns"
+        @confirm="onEnginePick"
+        @cancel="showEngine = false"
+        show-toolbar
+        :title="$t('lesson.engine')"
+      />
+    </van-popup>
+
+    <!-- 循环模式选择 -->
+    <van-popup v-model:show="showLoop" position="bottom" round>
+      <van-picker
+        :columns="loopColumns"
+        @confirm="onLoopPick"
+        @cancel="showLoop = false"
+        show-toolbar
+        :title="$t('lesson.settings')"
+      />
+    </van-popup>
   </div>
 </template>
 
@@ -100,10 +124,13 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { lessonApi, bookApi, learningApi } from '../../api'
-import { showSuccessToast } from 'vant'
+import { showSuccessToast, showConfirmDialog } from 'vant'
 import 'vant/es/toast/style'
+import 'vant/es/dialog/style'
 import { useUserStore } from '../../store/user'
 import ReadingView from './reading.vue'
+import { useProgressReport, checkLessonResume } from '../../composables/useProgressReport'
+import { createScrollTracker } from '../../utils/scroll-track'
 import {
   speechSupported,
   onTTSState,
@@ -131,6 +158,8 @@ const supported = speechSupported()
 
 const ttsState = ref({ active: false, paused: false, index: -1, total: 0, track: false })
 onTTSState((s) => { ttsState.value = s })
+// ---- 学习进度自动上报（10s 节流，跨端存服务端）----
+const { flush: flushProgress } = useProgressReport(() => route.params.id, ttsState)
 
 // 学习进度（服务端存储，电脑/手机跨端同步）
 const userStore = useUserStore()
@@ -212,6 +241,27 @@ function playAll() {
   }
   playItems(items, { totalWords: list.length, track: true, speakMode: 'all' })
 }
+
+// 从第 n 个词续播（「继续上次学习」）
+function playWordsFrom(n) {
+  const list = filteredVocabs.value
+  if (!list.length) return
+  const items = list.map((v, i) => ({ text: v.word, wordIndex: i }))
+  const start = items.findIndex((it) => it.wordIndex >= n)
+  playItems(items, { totalWords: list.length, track: true, speakMode: 'words', startIndex: start < 0 ? 0 : start })
+}
+
+// 进入页面/换课时：有历史位置且未完成 → 提示继续
+async function promptResume(lid) {
+  const n = await checkLessonResume(() => lid, userStore)
+  if (!n || bookType.value === 2) return // 阅读课由内嵌 ReadingView 处理
+  showConfirmDialog({
+    title: t('lesson.resumeTitle'),
+    message: t('lesson.resumeBody', { n }),
+    confirmButtonText: t('lesson.resumeYes'),
+    cancelButtonText: t('lesson.resumeNo')
+  }).then(() => playWordsFrom(n)).catch(() => {})
+}
 function speakOne(text) {
   if (!text) return
   playItems([text])
@@ -255,34 +305,40 @@ const loopOptions = computed(() => [
   { value: 'book', label: t('lesson.loopBook') }
 ])
 watch(loopMode, (m) => setLoopMode(m))
+// 设置弹层 / 循环模式选择器
+const showSettings = ref(false)
+const showLoop = ref(false)
+const loopLabel = computed(() => loopOptions.value.find((o) => o.value === loopMode.value)?.label || '')
+const loopColumns = computed(() => loopOptions.value.map((o) => ({ text: o.label, value: o.value })))
+function onLoopPick({ selectedValues }) {
+  loopMode.value = selectedValues[0]
+  showLoop.value = false
+}
 
 // ---- 自动滚屏：跟读时把当前词条滚到可视区中间 ----
 const autoScroll = ref(true)
+const rootEl = ref(null)
+const tracker = createScrollTracker()
 const cardEls = {}
 function setCardRef(id, el) {
   if (el) cardEls[id] = el
   else delete cardEls[id]
 }
 function scrollToCurrent() {
-  if (!ttsState.value.active || !ttsState.value.track || !autoScroll.value) return
+  if (!ttsState.value.active || !ttsState.value.track || !autoScroll.value) { tracker.stop(); return }
   const v = filteredVocabs.value[ttsState.value.index]
-  const raw = v && cardEls[v.id]
-  if (!raw) return
-  // van-cell 是组件，函数式 ref 拿到的是组件实例；真实 DOM 在 $el 上
-  const el = raw.$el || raw
-  if (!el || typeof el.getBoundingClientRect !== 'function') return
-  const rect = el.getBoundingClientRect()
-  const vh = window.innerHeight
-  // 已在可视区中间带内则不滚，避免抖动
-  if (rect.top >= 100 && rect.bottom <= vh - 100) return
-  // 部分安卓浏览器 scrollIntoView(smooth) 静默失效，改用手动计算滚动
-  const top = rect.top + window.pageYOffset - vh / 2 + rect.height / 2
-  window.scrollTo({ top, behavior: 'smooth' })
+  if (!v) return
+  // van-cell 组件 ref 的真实 DOM 在 $el 上，ensureVisible 内部已兼容
+  const headerEl = rootEl.value ? rootEl.value.querySelector('.head') : null
+  tracker.ensureVisible(cardEls[v.id], headerEl, {
+    isActive: () => ttsState.value.active && ttsState.value.track && autoScroll.value
+  })
 }
 watch(
   () => [ttsState.value.active, ttsState.value.index, ttsState.value.track],
   () => nextTick(scrollToCurrent)
 )
+watch(autoScroll, (on) => { if (!on) tracker.stop() })
 
 // ---- 本书循环：播完本书最后一课跳下一课并自动续播（跨课经 sessionStorage 传递） ----
 const bookLessons = ref([])
@@ -336,6 +392,8 @@ function consumePendingAutoPlay(lid) {
 }
 // 路由参数变化（本书循环跳下一课）时组件实例被复用，onMounted 不再执行，必须显式重载
 watch(() => route.params.id, async (newId) => {
+  // 组件复用（/m/lesson/:id 只变参数）不触发卸载，必须显式终止旧课会话
+  stopTTS()
   await loadLesson(newId)
   consumePendingAutoPlay(newId)
 })
@@ -348,6 +406,8 @@ async function loadLesson(lid) {
     const [l, vs] = await Promise.all([lessonApi.get(lid), lessonApi.vocabularies(lid)])
     lesson.value = l.data
     vocabs.value = vs.data || []
+    // 预取本书课时列表（上一课/下一课导航用），不阻塞主流程
+    loadBookLessons()
     // 取书本类型：1=词汇书 2=阅读书（类型固定，决定走词表还是阅读视图）
     if (l.data?.bookId) {
       try {
@@ -358,9 +418,30 @@ async function loadLesson(lid) {
   } catch (e) { vocabs.value = [] }
   finally { loading.value = false }
   refreshDone(lid)
+  promptResume(lid)
+}
+
+// ---- 上一课 / 下一课导航（按本书课时列表顺序） ----
+function navNeighbor(offset) {
+  const ls = bookLessons.value
+  const idx = ls.findIndex((l) => String(l.id) === String(route.params.id))
+  if (idx < 0) return null
+  return ls[idx + offset] || null
+}
+const prevLesson = computed(() => navNeighbor(-1))
+const nextLesson = computed(() => navNeighbor(1))
+function goNavLesson(l) {
+  stopTTS()
+  // 清掉可能的跨课续播标记，避免误触发自动播放
+  try { sessionStorage.removeItem('gre-book-loop') } catch (e) { /* ignore */ }
+  router.push(`/m/lesson-detail/${l.id}`)
+  // 换课后回到页面顶部
+  nextTick(() => window.scrollTo(0, 0))
 }
 
 onMounted(async () => {
+  // 清掉上个页面残留的播放会话，避免「继续」播到别页内容
+  if (ttsState.value.active) stopTTS()
   buildEngineList()
   // /api/tts/engines 为异步拉取，就绪后刷新引擎列表
   window.addEventListener('gre-engines-updated', buildEngineList)
@@ -369,6 +450,8 @@ onMounted(async () => {
 })
 onUnmounted(() => {
   stopTTS()
+  flushProgress()
+  tracker.stop()
   window.removeEventListener('gre-engines-updated', buildEngineList)
   window.removeEventListener('kokoro-progress', onKokoroProgress)
 })
@@ -376,21 +459,44 @@ onUnmounted(() => {
 
 <style scoped>
 .m-detail { padding-bottom: 12px; }
-.topbar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 14px; background: #fff; border-bottom: 1px solid #ebedf0;
+.head {
   position: sticky; top: 0; z-index: 10;
+  background: #fff; box-shadow: 0 2px 8px rgba(100, 101, 102, 0.12);
 }
-.topbar .title { font-size: 16px; font-weight: 600; }
-.topbar .back { font-size: 20px; color: #4f6df5; }
-.toolbar { padding: 10px 12px 0; display: flex; flex-direction: column; gap: 8px; }
-.engine-field { padding: 4px 10px; }
-.engine-field :deep(.van-field__label) { width: 36px; }
-.actions { display: flex; gap: 8px; }
-.actions .van-button { flex: 1 1 0; margin-left: 0; }
+.title-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; background: #fff; border-bottom: 1px solid #ebedf0;
+}
+.title-row .sbtn { font-size: 20px; color: #4f6df5; flex: 0 0 auto; }
+.title-row .title {
+  flex: 1 1 auto; font-size: 16px; font-weight: 600; text-align: center;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.chipbar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 10px; background: #fff; border-bottom: 1px solid #ebedf0;
+}
+.chipbar .play-btn { margin-left: auto; border-radius: 15px; }
+.chip {
+  font-size: 12px; padding: 5px 10px; border-radius: 14px;
+  border: 1px solid #c8c9cc; color: #323233; white-space: nowrap;
+}
+.chip.on { background: #4f6df5; border-color: #4f6df5; color: #fff; }
+.sq-btn {
+  width: 30px; height: 30px; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px; border: 1px solid #c8c9cc; color: #4f6df5; font-size: 15px;
+}
+.sq-btn.disabled { color: #c8c9cc; }
+.settings-sheet { padding: 14px 14px 24px; }
+.sheet-title { text-align: center; font-weight: 600; font-size: 15px; margin-bottom: 12px; }
+.sheet-row { display: flex; gap: 8px; margin-top: 10px; }
+.sheet-row .van-button { flex: 1 1 0; margin-left: 0; }
+.engine-field { padding: 4px 10px; border: 1px solid #ebedf0; border-radius: 8px; }
+.engine-field :deep(.van-field__label) { width: 64px; white-space: nowrap; }
 .tts-bar {
   display: flex; align-items: center; justify-content: space-between;
-  margin: 10px 12px; padding: 8px 12px; background: #fff;
+  margin: 0 12px 8px; padding: 8px 12px; background: #fff;
   border: 1px solid #ebedf0; border-radius: 8px;
 }
 .tts-bar .status { font-size: 13px; color: #4f6df5; font-weight: 600; }

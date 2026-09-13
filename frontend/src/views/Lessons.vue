@@ -19,11 +19,11 @@
         @click="selectBook(b.id)"
       >
         <div class="book-title">{{ b.title }}</div>
-        <el-tag v-if="b.bookType === 2" size="small" type="primary" effect="plain" style="margin-right:4px">阅读</el-tag>
-        <el-tag v-if="b.mine" size="small" type="warning" effect="plain">我的</el-tag>
-        <el-tag v-else-if="b.browsePublic" size="small" type="success" effect="plain">展示</el-tag>
-        <el-tag v-else size="small" type="info" effect="plain">公共</el-tag>
-        <div class="book-meta">共 {{ planOf(b.id)?.totalWords || 0 }} 词</div>
+        <el-tag v-if="b.bookType === 2" size="small" type="primary" effect="plain" style="margin-right:4px">{{ $t('lessons.tagReading') }}</el-tag>
+        <el-tag v-if="b.mine" size="small" type="warning" effect="plain">{{ $t('lessons.tagMine') }}</el-tag>
+        <el-tag v-else-if="b.browsePublic" size="small" type="success" effect="plain">{{ $t('lessons.tagShowcase') }}</el-tag>
+        <el-tag v-else size="small" type="info" effect="plain">{{ $t('lessons.tagPublic') }}</el-tag>
+        <div class="book-meta">{{ $t('lessons.totalWordsOf', { n: planOf(b.id)?.totalWords || 0 }) }}</div>
         <el-progress
           v-if="planOf(b.id)"
           :percentage="planOf(b.id).percent"
@@ -31,8 +31,8 @@
           style="margin-top:6px"
         />
         <div class="book-actions" v-if="b.mine" @click.stop>
-          <el-button size="small" text type="primary" @click="openSettings(b)">设置/计划</el-button>
-          <el-button size="small" text type="danger" @click="removeBook(b)">删除</el-button>
+          <el-button size="small" text type="primary" @click="openSettings(b)">{{ $t('lessons.settingsPlan') }}</el-button>
+          <el-button size="small" text type="danger" @click="removeBook(b)">{{ $t('common.delete') }}</el-button>
         </div>
       </div>
     </div>
@@ -42,106 +42,106 @@
       type="info"
       :closable="false"
       show-icon
-      title="未登录仅可浏览书本目录"
-      description="登录后即可查看课时内容、开始学习与制定计划。"
+      :title="$t('lessons.anonTitle')"
+      :description="$t('lessons.anonDesc')"
       style="margin-bottom:16px"
     />
-    <el-empty v-if="!loading && !filtered.length" :description="userStore.isLogin ? '该书本无课时，请到后台导入 PDF 词汇，或上传你自己的书本' : '登录后可查看课时内容并开始学习'" />
+    <el-empty v-if="!loading && !filtered.length" :description="userStore.isLogin ? $t('lessons.emptyOwner') : $t('lessons.emptyAnon')" />
     <el-row v-else :gutter="16">
       <el-col v-for="l in filtered" :key="l.id" :xs="24" :sm="12" :md="8" :lg="6">
         <el-card class="lesson-card" shadow="hover" @click="open(l)">
           <div class="title">{{ l.title }}</div>
-          <div class="meta">{{ l.wordCount }} 词</div>
+          <div class="meta">{{ l.wordCount }} {{ $t('lessons.words') }}</div>
           <div class="desc">{{ l.description }}</div>
         </el-card>
       </el-col>
     </el-row>
 
     <!-- 上传书本对话框 -->
-    <el-dialog v-model="uploadVisible" title="上传我的书本（PDF）" width="480px">
+    <el-dialog v-model="uploadVisible" :title="$t('lessons.uploadDialogTitle')" width="480px">
       <el-form label-width="96px">
-        <el-form-item label="目标书本">
-          <el-select v-model="upload.target" placeholder="选择目标" style="width:100%">
-            <el-option label="＋ 新建一本新书" :value="0" />
+        <el-form-item :label="$t('lessons.pickBook')">
+          <el-select v-model="upload.target" :placeholder="$t('lessons.pickBookPh')" style="width:100%">
+            <el-option :label="$t('lessons.newBook')" :value="0" />
             <el-option v-for="b in myBooks" :key="b.id" :label="b.title" :value="b.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="书本名称" v-if="!upload.target">
-          <el-input v-model="upload.title" placeholder="如：我的 GRE 核心词" />
+        <el-form-item :label="$t('lessons.bookName')" v-if="!upload.target">
+          <el-input v-model="upload.title" :placeholder="$t('lessons.bookNamePh')" />
         </el-form-item>
-        <el-form-item label="每课单词数">
+        <el-form-item :label="$t('lessons.wordsPerLesson')">
           <el-input-number v-model="upload.wordsPerLesson" :min="1" :max="500" />
-          <span class="hint">导入后按此数量自动切分课时</span>
+          <span class="hint">{{ $t('lessons.splitHint') }}</span>
         </el-form-item>
-        <el-form-item label="PDF 文件">
+        <el-form-item :label="$t('lessons.pdfFile')">
           <input type="file" accept=".pdf" @change="onFileChange" />
         </el-form-item>
       </el-form>
       <el-alert
         v-if="uploading"
-        title="正在识别 PDF 并导入，扫描版可能需要 3-5 分钟，请勿关闭窗口"
+        :title="$t('lessons.ocrWait')"
         type="info"
         :closable="false"
         show-icon
       />
       <template #footer>
-        <el-button @click="uploadVisible = false">取消</el-button>
-        <el-button type="primary" :loading="uploading" @click="submitUpload">开始导入</el-button>
+        <el-button @click="uploadVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="uploading" @click="submitUpload">{{ $t('lessons.startImport') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 设置 / 计划对话框 -->
-    <el-dialog v-model="settingsVisible" title="书本设置与学习计划" width="520px">
+    <el-dialog v-model="settingsVisible" :title="$t('lessons.settingsTitle')" width="520px">
       <template v-if="current">
         <el-form label-width="96px">
-          <el-form-item label="书本名称">
+          <el-form-item :label="$t('lessons.bookName')">
             <span>{{ current.title }}</span>
-            <el-tag size="small" type="warning" effect="plain" style="margin-left:8px">我的</el-tag>
+            <el-tag size="small" type="warning" effect="plain" style="margin-left:8px">{{ $t('lessons.tagMine') }}</el-tag>
           </el-form-item>
         </el-form>
 
         <!-- 阅读书：单词计划不适用 -->
         <template v-if="current.bookType === 2">
           <el-alert
-            title="阅读书暂不支持单词学习计划"
+            :title="$t('lessons.readingNoPlan')"
             type="info"
             :closable="false"
             show-icon
-            description="当前书本为阅读片段，不统计词汇数。如需设定阅读进度，可直接进入课时学习。"
+            :description="$t('lessons.readingNoPlanDesc')"
           />
         </template>
 
         <!-- 词汇书：正常显示计划 -->
         <template v-else>
           <el-form label-width="96px">
-            <el-form-item label="每课单词数">
+            <el-form-item :label="$t('lessons.wordsPerLesson')">
               <el-input-number v-model="planForm.wordsPerLesson" :min="1" :max="500" />
-              <el-button style="margin-left:8px" :loading="resplitting" @click="doResplit">按此重切分课时</el-button>
+              <el-button style="margin-left:8px" :loading="resplitting" @click="doResplit">{{ $t('lessons.resplitBtn') }}</el-button>
             </el-form-item>
-            <el-divider>学习计划</el-divider>
-            <el-form-item label="每日目标词数">
+            <el-divider>{{ $t('lessons.planSection') }}</el-divider>
+            <el-form-item :label="$t('lessons.dailyGoal')">
               <el-input-number v-model="planForm.dailyGoal" :min="1" :max="2000" />
             </el-form-item>
-            <el-form-item label="计划开始">
-              <el-date-picker v-model="planForm.startDate" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" />
+            <el-form-item :label="$t('lessons.startDate')">
+              <el-date-picker v-model="planForm.startDate" type="date" value-format="YYYY-MM-DD" :placeholder="$t('lessons.startDate')" />
             </el-form-item>
-            <el-form-item label="计划结束">
-              <el-date-picker v-model="planForm.endDate" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" />
+            <el-form-item :label="$t('lessons.endDate')">
+              <el-date-picker v-model="planForm.endDate" type="date" value-format="YYYY-MM-DD" :placeholder="$t('lessons.endDate')" />
             </el-form-item>
           </el-form>
 
           <el-card class="plan-card" shadow="never">
-            <div class="plan-row"><span>总词数</span><b>{{ plan.totalWords }}</b></div>
-            <div class="plan-row"><span>已学</span><b>{{ plan.learnedWords }}</b></div>
-            <div class="plan-row"><span>剩余</span><b>{{ plan.remainWords }}</b></div>
-            <div class="plan-row"><span>预计完成</span><b>{{ plan.expectedFinishDate || '未设目标' }}</b></div>
+            <div class="plan-row"><span>{{ $t('lessons.progressTotal') }}</span><b>{{ plan.totalWords }}</b></div>
+            <div class="plan-row"><span>{{ $t('lessons.progressLearned') }}</span><b>{{ plan.learnedWords }}</b></div>
+            <div class="plan-row"><span>{{ $t('lessons.progressRemain') }}</span><b>{{ plan.remainWords }}</b></div>
+            <div class="plan-row"><span>{{ $t('lessons.expectedFinish') }}</span><b>{{ plan.expectedFinishDate || $t('lessons.noGoal') }}</b></div>
             <el-progress :percentage="plan.percent" :stroke-width="10" style="margin-top:8px" />
           </el-card>
         </template>
       </template>
       <template #footer>
-        <el-button @click="settingsVisible = false">关闭</el-button>
-        <el-button v-if="current && current.bookType !== 2" type="primary" :loading="saving" @click="savePlan">保存设置</el-button>
+        <el-button @click="settingsVisible = false">{{ $t('common.close') }}</el-button>
+        <el-button v-if="current && current.bookType !== 2" type="primary" :loading="saving" @click="savePlan">{{ $t('common.save') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -149,6 +149,7 @@
 
 <script setup>
 import { ref, computed, reactive, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { lessonApi, bookApi } from '../api'
@@ -156,6 +157,7 @@ import { useUserStore } from '../store/user'
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 const userStore = useUserStore()
 const books = ref([])
 const selectedBook = ref(null)
@@ -165,7 +167,7 @@ const kw = ref('')
 const plans = ref({}) // bookId -> plan
 
 const bookOptions = computed(() => {
-  return [{ id: null, title: '全部', description: '显示所有书本的课时' }, ...books.value]
+  return [{ id: null, title: t('lessons.allBooks'), description: t('lessons.allBooksDesc') }, ...books.value]
 })
 const myBooks = computed(() => books.value.filter((b) => b.mine))
 const filtered = computed(() =>
@@ -219,8 +221,8 @@ function openUpload() { upload.target = 0; upload.title = ''; upload.wordsPerLes
 function onFileChange(e) { uploadFile.value = e.target.files && e.target.files[0] }
 
 async function submitUpload() {
-  if (!uploadFile.value) { ElMessage.warning('请选择 PDF 文件'); return }
-  if (!upload.target && !upload.title.trim()) { ElMessage.warning('请填写书本名称'); return }
+  if (!uploadFile.value) { ElMessage.warning(t('lessons.needPdf')); return }
+  if (!upload.target && !upload.title.trim()) { ElMessage.warning(t('lessons.needTitle')); return }
   uploading.value = true
   try {
     const { data } = await bookApi.importBook(uploadFile.value, {
@@ -228,7 +230,7 @@ async function submitUpload() {
       bookId: upload.target || null,
       wordsPerLesson: upload.wordsPerLesson
     })
-    ElMessage.success(`导入成功：${data.lessonCount} 课时 / ${data.vocabCount} 词`)
+    ElMessage.success(t('lessons.importOk', { l: data.lessonCount, w: data.vocabCount }))
     uploadVisible.value = false
     await refreshBooks()
     if (data.bookId) await selectBook(data.bookId)
@@ -264,7 +266,7 @@ async function savePlan() {
       planStartDate: planForm.startDate,
       planEndDate: planForm.endDate
     })
-    ElMessage.success('已保存')
+    ElMessage.success(t('common.saved'))
     await refreshBooks()
     const p = await bookApi.plan(current.value.id)
     Object.assign(plan, p.data)
@@ -276,18 +278,18 @@ async function doResplit() {
   resplitting.value = true
   try {
     const { data } = await bookApi.resplit(current.value.id, planForm.wordsPerLesson)
-    ElMessage.success(`已按每课 ${planForm.wordsPerLesson} 词重切分：${data.lessonCount} 课时`)
+    ElMessage.success(t('lessons.resplitOk', { n: planForm.wordsPerLesson, l: data.lessonCount }))
     await refreshBooks()
   } catch (e) {} finally { resplitting.value = false }
 }
 
 async function removeBook(b) {
   try {
-    await ElMessageBox.confirm(`确定删除书本「${b.title}」？其下课时与词汇将一并删除（不可恢复）。`, '删除确认', { type: 'warning' })
+    await ElMessageBox.confirm(t('lessons.deleteConfirm', { name: b.title }), t('lessons.deleteTitle'), { type: 'warning' })
   } catch (e) { return }
   try {
     await bookApi.remove(b.id)
-    ElMessage.success('已删除')
+    ElMessage.success(t('common.deleted'))
     await refreshBooks()
   } catch (e) {}
 }

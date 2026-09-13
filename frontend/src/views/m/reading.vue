@@ -1,35 +1,13 @@
 <template>
-  <div class="m-reading">
-    <div class="toolbar">
-      <van-field
-        v-model="engineLabel"
-        readonly
-        is-link
-        :label="$t('lesson.engine')"
-        class="engine-field"
-        @click="showEngine = true"
-      />
-      <van-popup v-model:show="showEngine" position="bottom" round>
-        <van-picker
-          :columns="engineColumns"
-          @confirm="onEnginePick"
-          @cancel="showEngine = false"
-          show-toolbar
-          :title="$t('lesson.engine')"
-        />
-      </van-popup>
-
-      <div class="actions">
-        <van-button size="small" :type="showZh ? 'primary' : 'default'" :disabled="!zhReady || ttsState.active" @click="showZh = !showZh">
-          {{ showZh ? $t('mobile.hideZh') : $t('mobile.showZh') }}
-        </van-button>
-        <van-button size="small" type="primary" :disabled="!supported || ttsState.active || !enSentences.length" @click="speakReading">{{ $t('mobile.speakAll') }}</van-button>
-      </div>
-      <div class="actions">
-        <van-button size="small" :type="autoScroll ? 'primary' : 'default'" @click="autoScroll = !autoScroll">{{ $t('lesson.autoScroll') }}</van-button>
-        <van-button size="small" v-for="m in loopOptions" :key="m.value"
-          :type="loopMode === m.value ? 'primary' : 'default'" @click="loopMode = m.value">{{ m.label }}</van-button>
-      </div>
+  <div class="m-reading" ref="rootEl">
+    <div class="head">
+    <div class="chipbar">
+      <span v-if="prev" class="sq-btn" @click="$emit('nav', prev)"><van-icon name="arrow-left" /></span>
+      <span v-if="next" class="sq-btn" @click="$emit('nav', next)"><van-icon name="arrow" /></span>
+      <span class="chip" :class="{ on: autoScroll }" @click="autoScroll = !autoScroll">{{ $t('lesson.autoScroll') }}</span>
+      <span class="chip" @click="showLoop = true">{{ loopLabel }} ▾</span>
+      <van-button size="small" type="primary" class="play-btn" :disabled="!supported || ttsState.active || !enSentences.length" @click="speakReading">{{ $t('mobile.speakAll') }}</van-button>
+      <van-icon name="setting-o" class="sbtn" @click="showSettings = true" />
     </div>
 
     <div v-if="ttsState.active" class="tts-bar">
@@ -39,6 +17,7 @@
         <van-button size="small" @click="restartTTS">↺</van-button>
         <van-button size="small" @click="stopTTS">⏹</van-button>
       </div>
+    </div>
     </div>
     <van-notice-bar v-if="kokoroLoading" wrapable :scrollable="false" class="kokoro-tip"
       :text="$t('lesson.kokoroTip', { pct: kokoroPct })" />
@@ -65,6 +44,45 @@
 
     <van-loading v-if="loading" class="center" />
     <van-notice-bar v-if="!supported" :text="$t('lesson.noSupportShort')" />
+
+    <!-- 设置弹层（低频操作收纳）：发音引擎 / 显示中文 -->
+    <van-popup v-model:show="showSettings" position="bottom" round class="settings-sheet">
+      <div class="sheet-title">{{ $t('lesson.settings') }}</div>
+      <van-field
+        v-model="engineLabel"
+        readonly
+        is-link
+        :label="$t('lesson.engine')"
+        class="engine-field"
+        @click="showEngine = true"
+      />
+      <div class="sheet-row between">
+        <span class="sheet-label" :class="{ dim: !zhReady }">{{ showZh ? $t('mobile.hideZh') : $t('mobile.showZh') }}</span>
+        <van-switch v-model="showZh" size="22px" :disabled="!zhReady" />
+      </div>
+    </van-popup>
+
+    <!-- 发音引擎选择 -->
+    <van-popup v-model:show="showEngine" position="bottom" round>
+      <van-picker
+        :columns="engineColumns"
+        @confirm="onEnginePick"
+        @cancel="showEngine = false"
+        show-toolbar
+        :title="$t('lesson.engine')"
+      />
+    </van-popup>
+
+    <!-- 循环模式选择 -->
+    <van-popup v-model:show="showLoop" position="bottom" round>
+      <van-picker
+        :columns="loopColumns"
+        @confirm="onLoopPick"
+        @cancel="showLoop = false"
+        show-toolbar
+        :title="$t('lesson.settings')"
+      />
+    </van-popup>
   </div>
 </template>
 
@@ -72,9 +90,12 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { lessonApi, learningApi } from '../../api'
-import { showSuccessToast } from 'vant'
+import { showSuccessToast, showConfirmDialog } from 'vant'
 import 'vant/es/toast/style'
+import 'vant/es/dialog/style'
 import { useUserStore } from '../../store/user'
+import { createScrollTracker } from '../../utils/scroll-track'
+import { useProgressReport, checkLessonResume } from '../../composables/useProgressReport'
 import {
   speechSupported,
   onTTSState,
@@ -93,8 +114,12 @@ import {
 const props = defineProps({
   lessonId: { type: [String, Number], required: true },
   title: { type: String, default: '' },
-  bookId: { type: [String, Number], default: null }
+  bookId: { type: [String, Number], default: null },
+  // 上一课/下一课（父级 lesson-detail 按本书课时顺序传入，点击时 emit nav）
+  prev: { type: Object, default: null },
+  next: { type: Object, default: null }
 })
+const emit = defineEmits(['nav'])
 
 // 学习进度（服务端存储，电脑/手机跨端同步）
 const userStore = useUserStore()
@@ -120,6 +145,8 @@ const loading = ref(false)
 const supported = speechSupported()
 const ttsState = ref({ active: false, paused: false, index: -1, total: 0, track: false })
 onTTSState((s) => { ttsState.value = s })
+// ---- 学习进度自动上报（10s 节流，跨端存服务端）----
+const { flush: flushProgress } = useProgressReport(() => props.lessonId, ttsState)
 
 // Kokoro 语音包加载进度提示（首次 92MB 下载 + wasm 推理需要等待，给用户明确反馈）
 const kokoroLoading = ref(false)
@@ -270,28 +297,40 @@ function speakReading() {
   playItems(items, { totalWords: list.length, track: true, speakMode: 'reading' })
 }
 
+// 从第 n 句续播（「继续上次学习」）
+async function promptResume(lid) {
+  const n = await checkLessonResume(() => lid, userStore)
+  if (!n) return
+  showConfirmDialog({
+    title: t('lesson.resumeTitle'),
+    message: t('lesson.resumeBody', { n }),
+    confirmButtonText: t('lesson.resumeYes'),
+    cancelButtonText: t('lesson.resumeNo')
+  }).then(() => {
+    const all = rows.value.map((r) => r.en).filter(Boolean)
+    const start = Math.min(Math.max(n, 0), all.length - 1)
+    const items = all.map((s, i) => ({ text: s, wordIndex: i }))
+    playItems(items, { totalWords: all.length, track: true, speakMode: 'reading', startIndex: start })
+  }).catch(() => {})
+}
+
 // ---- 自动滚屏 ----
 const autoScroll = ref(true)
+const rootEl = ref(null)
 const enEls = {}
+const tracker = createScrollTracker()
 function setEnRef(i, el) {
   if (el) enEls[i] = el
   else delete enEls[i]
 }
-function scrollToCurrent(force = false) {
-  if (!ttsState.value.active || !ttsState.value.track || !autoScroll.value) return
+function scrollToCurrent() {
+  if (!ttsState.value.active || !ttsState.value.track || !autoScroll.value) { tracker.stop(); return }
   const idx = ttsState.value.index
   if (idx < 0) return
-  const el = enEls[idx]
-  if (!el) return
-  if (!force) {
-    const rect = el.getBoundingClientRect()
-    const vh = window.innerHeight
-    if (rect.top >= 80 && rect.bottom <= vh - 40) return
-  }
-  // 部分安卓浏览器 scrollIntoView(smooth) 静默失效，改用手动计算滚动
-  const rect = el.getBoundingClientRect()
-  const top = rect.top + window.pageYOffset - window.innerHeight / 2 + rect.height / 2
-  window.scrollTo({ top, behavior: 'smooth' })
+  const headerEl = rootEl.value ? rootEl.value.querySelector('.head') : null
+  tracker.ensureVisible(enEls[idx], headerEl, {
+    isActive: () => ttsState.value.active && ttsState.value.track && autoScroll.value
+  })
 }
 
 // ---- 循环模式（与电脑版一致：不循环/本课循环/本书循环；本书循环跳课由父级 lesson-detail 处理） ----
@@ -303,20 +342,32 @@ const loopOptions = computed(() => [
   { value: 'book', label: t('lesson.loopBook') }
 ])
 watch(loopMode, (m) => setLoopMode(m))
+// 设置弹层 / 循环模式选择器
+const showSettings = ref(false)
+const showLoop = ref(false)
+const loopLabel = computed(() => loopOptions.value.find((o) => o.value === loopMode.value)?.label || '')
+const loopColumns = computed(() => loopOptions.value.map((o) => ({ text: o.label, value: o.value })))
+function onLoopPick({ selectedValues }) {
+  loopMode.value = selectedValues[0]
+  showLoop.value = false
+}
 
 // TTS 进度变化时滚动到当前句（顶层 watch，避免重复注册）
 watch(
   () => [ttsState.value.active, ttsState.value.index, ttsState.value.track],
-  () => nextTick(() => scrollToCurrent(true))
+  () => nextTick(scrollToCurrent)
 )
+watch(autoScroll, (on) => { if (!on) tracker.stop() })
 
 // 屏幕尺寸变化后重新对齐
 let resizeTimer = null
 function onResize() {
   clearTimeout(resizeTimer)
-  resizeTimer = setTimeout(() => nextTick(() => scrollToCurrent(false)), 250)
+  resizeTimer = setTimeout(() => nextTick(scrollToCurrent), 250)
 }
 onMounted(() => {
+  // 清掉上个页面残留的播放会话（如 A 页暂停后切到本页），避免「继续」播到别页内容
+  if (ttsState.value.active) stopTTS()
   window.addEventListener('resize', onResize)
   window.addEventListener('orientationchange', onResize)
   buildEngineList()
@@ -325,11 +376,15 @@ onMounted(() => {
   window.addEventListener('kokoro-progress', onKokoroProgress)
 })
 onUnmounted(() => {
+  // 播放中/暂停中离开页面一律终止会话，防止串台
+  stopTTS()
+  flushProgress()
   window.removeEventListener('resize', onResize)
   window.removeEventListener('orientationchange', onResize)
   window.removeEventListener('gre-engines-updated', buildEngineList)
   window.removeEventListener('kokoro-progress', onKokoroProgress)
   clearTimeout(resizeTimer)
+  tracker.stop()
 })
 
 function togglePause() {
@@ -352,6 +407,7 @@ async function loadPassage(lid) {
 
 onMounted(async () => {
   await loadPassage(props.lessonId)
+  promptResume(props.lessonId)
   // 本书循环跨课续播标记（父级写入，本组件按 speakMode==='reading' 消费）
   consumePendingAutoPlay(props.lessonId)
 })
@@ -370,20 +426,44 @@ function consumePendingAutoPlay(lid) {
 
 watch(() => props.lessonId, async (newId) => {
   await loadPassage(newId)
+  promptResume(newId)
   consumePendingAutoPlay(newId)
 })
 </script>
 
 <style scoped>
 .m-reading { padding-bottom: 12px; }
-.toolbar { padding: 10px 12px 0; display: flex; flex-direction: column; gap: 8px; }
-.engine-field { padding: 4px 10px; }
-.engine-field :deep(.van-field__label) { width: 36px; }
-.actions { display: flex; gap: 8px; }
-.actions .van-button { flex: 1 1 0; margin-left: 0; }
+.head {
+  position: sticky; top: 0; z-index: 10;
+  background: #fff; box-shadow: 0 2px 8px rgba(100, 101, 102, 0.12);
+}
+.chipbar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 10px; background: #fff; border-bottom: 1px solid #ebedf0;
+}
+.chipbar .play-btn { margin-left: auto; border-radius: 15px; }
+.chipbar .sbtn { font-size: 20px; color: #4f6df5; flex: 0 0 auto; margin-left: 2px; }
+.chip {
+  font-size: 12px; padding: 5px 10px; border-radius: 14px;
+  border: 1px solid #c8c9cc; color: #323233; white-space: nowrap;
+}
+.chip.on { background: #4f6df5; border-color: #4f6df5; color: #fff; }
+.sq-btn {
+  width: 30px; height: 30px; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px; border: 1px solid #c8c9cc; color: #4f6df5; font-size: 15px;
+}
+.settings-sheet { padding: 14px 14px 24px; }
+.sheet-title { text-align: center; font-weight: 600; font-size: 15px; margin-bottom: 12px; }
+.sheet-row { display: flex; gap: 8px; margin-top: 10px; }
+.sheet-row.between { align-items: center; justify-content: space-between; }
+.sheet-label { font-size: 14px; color: #323233; }
+.sheet-label.dim { color: #c8c9cc; }
+.engine-field { padding: 4px 10px; border: 1px solid #ebedf0; border-radius: 8px; }
+.engine-field :deep(.van-field__label) { width: 64px; white-space: nowrap; }
 .tts-bar {
   display: flex; align-items: center; justify-content: space-between;
-  margin: 10px 12px; padding: 8px 12px; background: #fff;
+  margin: 0 12px 8px; padding: 8px 12px; background: #fff;
   border: 1px solid #ebedf0; border-radius: 8px;
 }
 .tts-bar .status { font-size: 13px; color: #4f6df5; font-weight: 600; }

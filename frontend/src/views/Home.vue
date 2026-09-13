@@ -1,8 +1,8 @@
 <template>
   <div class="home">
     <el-card class="hero" shadow="never">
-      <h1>📚 GRE 词汇知识分享</h1>
-      <p class="sub">把《美国学生用的 GRE 重要词汇及例句表》拆成课时，自动识别单词 / 音标 / 词性 / 释义 / 例句，点一下就能听发音。</p>
+      <h1>📚 {{ $t('app.title') }}</h1>
+      <p class="sub">{{ $t('home.sub') }}</p>
       <div class="actions">
         <el-button type="primary" size="large" @click="goLessons">{{ $t('home.start') }}</el-button>
         <el-button v-if="isAdmin" size="large" @click="goAdmin">{{ $t('nav.admin') }}</el-button>
@@ -11,23 +11,23 @@
 
     <el-row :gutter="16" class="stats">
       <el-col :xs="12" :sm="8">
-        <el-card shadow="hover"><div class="num">{{ stats.lessonCount }}</div><div class="lbl">课时</div></el-card>
+        <el-card shadow="hover"><div class="num">{{ stats.lessonCount }}</div><div class="lbl">{{ $t('home.statLessons') }}</div></el-card>
       </el-col>
       <el-col :xs="12" :sm="8">
-        <el-card shadow="hover"><div class="num">{{ stats.vocabCount }}</div><div class="lbl">词汇总量</div></el-card>
+        <el-card shadow="hover"><div class="num">{{ stats.vocabCount }}</div><div class="lbl">{{ $t('home.statVocabTotal') }}</div></el-card>
       </el-col>
       <el-col :xs="24" :sm="8">
-        <el-card shadow="hover"><div class="num">🔊</div><div class="lbl">单词 / 例句 语音朗读</div></el-card>
+        <el-card shadow="hover"><div class="num">🔊</div><div class="lbl">{{ $t('home.statTtsFull') }}</div></el-card>
       </el-col>
     </el-row>
 
     <el-card class="feat" shadow="never">
-      <h3>功能</h3>
+      <h3>{{ $t('home.features') }}</h3>
       <ul>
-        <li>📑 按固定词数自动切分课时（默认每课时 50 词）</li>
-        <li>🔍 自动识别：单词、音标（Barron's + 标准 IPA）、词性、释义、例句</li>
-        <li>🔊 浏览器内置语音朗读单词与例句，手机电脑自适应</li>
-        <li>🛠 后台可调整每课时包含哪些词、编辑任意字段</li>
+        <li>📑 {{ $t('home.featSplit') }}</li>
+        <li>🔍 {{ $t('home.featParse') }}</li>
+        <li>🔊 {{ $t('home.featTts') }}</li>
+        <li>🛠 {{ $t('home.featAdmin') }}</li>
       </ul>
     </el-card>
   </div>

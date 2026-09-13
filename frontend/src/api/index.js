@@ -105,5 +105,11 @@ export const bookApi = {
 export const learningApi = {
   markProgress: (lessonId) => http.post('/learning/progress', { lessonId }),
   getProgress: (lessonId) => http.get('/learning/progress', { params: { lessonId } }),
-  progressCount: () => http.get('/learning/progress/count')
+  progressCount: () => http.get('/learning/progress/count'),
+  // 自动进度：节流上报学习位置
+  visit: (lessonId, wordIndex) => http.post('/learning/progress/visit', { lessonId, wordIndex }),
+  // 最近学的未完成一课（供「继续学习」）
+  resume: () => http.get('/learning/progress/resume'),
+  // 单课时进度明细（含 lastWordIndex，供进入页面「继续上次」提示）
+  progressDetail: (lessonId) => http.get('/learning/progress/detail', { params: { lessonId } })
 }

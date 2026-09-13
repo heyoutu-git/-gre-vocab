@@ -13,6 +13,7 @@
     </div>
 
     <van-cell-group inset>
+      <van-cell v-if="resumeItem" :title="$t('mine.continueLearn')" :label="resumeItem.lessonTitle" icon="clock-o" is-link @click="goResume" />
       <van-cell :title="$t('mine.progress')" :label="progressLabel" icon="bar-chart-o" :to="userStore.isLogin ? '/m/lessons' : undefined" is-link />
       <van-cell :title="$t('mine.engine')" :label="engineName" icon="volume-o" @click="showEngine = true" is-link />
       <van-cell :title="$t('mine.voiceMode')" :label="kokoroPathName" icon="music-o" @click="showPath = true" is-link />
@@ -72,6 +73,16 @@ import { useI18n } from 'vue-i18n'
 
 const router = useRouter()
 const userStore = useUserStore()
+
+// ---- 继续学习：最近学的未完成一课 ----
+const resumeItem = ref(null)
+onMounted(async () => {
+  if (!userStore.isLogin) return
+  try { const { data } = await learningApi.resume(); resumeItem.value = data || null } catch (e) { /* ignore */ }
+})
+function goResume() {
+  if (resumeItem.value) router.push(`/m/lesson-detail/${resumeItem.value.lessonId}`)
+}
 
 const knownKey = 'gre-known'
 const favKey = 'gre-fav'

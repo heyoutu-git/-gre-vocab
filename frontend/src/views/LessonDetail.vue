@@ -1,13 +1,17 @@
 <template>
-  <div class="detail" v-loading="loading">
+  <div class="detail" v-loading="loading" ref="rootEl">
     <ReadingView v-if="bookType === 2" :lesson-id="route.params.id" :title="lesson?.title || ''" :book-id="lesson?.bookId" />
 
     <template v-else>
     <div class="topbar">
       <div class="bar">
         <div>
-          <el-button text @click="goBackLessons">← 课时目录</el-button>
+          <el-button text @click="goBackLessons">{{ $t('lesson.back') }}</el-button>
           <h2 style="display:inline; margin-left:8px;">{{ lesson?.title }}</h2>
+          <span v-if="prevLesson || nextLesson" class="lesson-nav-top">
+            <el-button v-if="prevLesson" size="small" @click="goNavLesson(prevLesson)">{{ $t('lesson.prevLesson') }}</el-button>
+            <el-button v-if="nextLesson" size="small" type="primary" @click="goNavLesson(nextLesson)">{{ $t('lesson.nextLesson') }}</el-button>
+          </span>
         </div>
         <div class="tools">
           <el-input v-model="kw" :placeholder="$t('lesson.search')" clearable style="width: 200px" :disabled="ttsState.active" />
@@ -76,19 +80,28 @@
       </div>
     </div>
 
-    <el-empty v-if="!loading && !filtered.length" description="无匹配词汇" />
+    <el-empty v-if="!loading && !filtered.length" :description="$t('lesson.noMatch')" />
     </template>
+
+    <!-- 上一课 / 下一课导航（词汇课与阅读课共用；首课无上一课，末课无下一课） -->
+    <div v-if="prevLesson || nextLesson" class="lesson-nav">
+      <el-button v-if="prevLesson" @click="goNavLesson(prevLesson)">{{ $t('lesson.prevLesson') }}</el-button>
+      <el-button v-if="nextLesson" type="primary" @click="goNavLesson(nextLesson)">{{ $t('lesson.nextLesson') }}</el-button>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Microphone } from '@element-plus/icons-vue'
 import { lessonApi, bookApi, learningApi } from '../api'
 import { useUserStore } from '../store/user'
 import ReadingView from './ReadingView.vue'
+import { useProgressReport, checkLessonResume } from '../composables/useProgressReport'
+import { createScrollTracker } from '../utils/scroll-track'
 import {
   speechSupported,
   onTTSState,
@@ -107,6 +120,7 @@ import {
 } from '../utils/tts'
 
 const route = useRoute()
+const { t } = useI18n()
 const router = useRouter()
 const lesson = ref(null)
 const vocabs = ref([])
@@ -119,6 +133,8 @@ const bookLessons = ref([])
 const loopMode = ref(getLoopMode())
 const ttsState = ref({ active: false, paused: false, index: -1, total: 0, track: false })
 onTTSState((s) => { ttsState.value = s })
+// ---- 学习进度自动上报（10s 节流，跨端存服务端）----
+const { flush: flushProgress } = useProgressReport(() => route.params.id, ttsState)
 
 // Kokoro 语音包加载进度提示（首次 92MB 下载 + wasm 推理需要等待，给用户明确反馈）
 const kokoroLoading = ref(false)
@@ -136,13 +152,13 @@ function onKokoroProgress(e) {
 
 // 发音引擎选择器（自动 / system / mespeak / tencent / kokoro；Kokoro 优先排前）
 const engineSel = ref(getEngine())
-const engineList = ref([{ code: 'auto', name: '自动' }])
+const engineList = ref([{ code: 'auto', name: t('lesson.auto') }])
 function buildEngineList() {
   const rest = getAvailableEngines()
     .slice()
     .sort((a, b) => (a.code === 'kokoro' ? -1 : b.code === 'kokoro' ? 1 : 0))
     .map((e) => ({ code: e.code, name: e.name }))
-  engineList.value = [{ code: 'auto', name: '自动' }, ...rest]
+  engineList.value = [{ code: 'auto', name: t('lesson.auto') }, ...rest]
 }
 function onEngineChange() { setEngine(engineSel.value) }
 
@@ -154,48 +170,41 @@ function goBackLessons() {
 
 // 跟读自动滚屏：记录每张卡片 DOM，当前词条变化时平滑滚动到可视区中央
 const autoScroll = ref(true)
+const rootEl = ref(null)
+const tracker = createScrollTracker()
 const cardEls = {}
 function setCardRef(id, el) {
   if (el) cardEls[id] = el
   else delete cardEls[id]
 }
-function scrollToCurrent(force = false) {
-  if (!ttsState.value.active || !ttsState.value.track || !autoScroll.value) return
+function scrollToCurrent() {
+  if (!ttsState.value.active || !ttsState.value.track || !autoScroll.value) { tracker.stop(); return }
   const idx = ttsState.value.index
   if (idx < 0) return
   const v = filtered.value[idx]
   if (!v) return
-  const el = cardEls[v.id]
-  if (!el) return
-  const main = document.querySelector('.el-main')
-  const topbar = document.querySelector('.topbar')
-  if (!main) return
-  const mainRect = main.getBoundingClientRect()
-  const elRect = el.getBoundingClientRect()
-  if (!force) {
-    // 普通跟读时：减去 sticky 控制条高度 + 留白，避免高亮卡片被挡住
-    const offset = (topbar ? topbar.offsetHeight : 0) + 12
-    const scrollTop = main.scrollTop + elRect.top - mainRect.top - offset
-    main.scrollTo({ top: scrollTop, behavior: 'smooth' })
-    return
-  }
-  // 屏幕尺寸变化后：强制把高亮卡片滚到 .el-main 可视区中间
-  const scrollTop = main.scrollTop + elRect.top - mainRect.top + el.offsetHeight / 2 - mainRect.height / 2
-  main.scrollTo({ top: Math.max(0, scrollTop), behavior: 'smooth' })
+  // 词汇卡片可能是组件 ref（$el 取真实 DOM），ensureVisible 内部已兼容
+  const headerEl = rootEl.value ? rootEl.value.querySelector('.topbar') : null
+  tracker.ensureVisible(cardEls[v.id], headerEl, {
+    isActive: () => ttsState.value.active && ttsState.value.track && autoScroll.value
+  })
 }
 watch(
   () => [ttsState.value.active, ttsState.value.index, ttsState.value.track],
-  () => nextTick(() => scrollToCurrent(true))
+  () => nextTick(scrollToCurrent)
 )
+watch(autoScroll, (on) => { if (!on) tracker.stop() })
 
 // 屏幕尺寸变化（横竖屏切换 / 窗口缩放）后，强制把高亮项滚回中间
 let resizeTimer = null
 function onResize() {
   clearTimeout(resizeTimer)
   // 延时稍长，等 Element Plus 按钮组换行/重排完成
-  resizeTimer = setTimeout(() => nextTick(() => scrollToCurrent(true)), 250)
+  resizeTimer = setTimeout(() => nextTick(scrollToCurrent), 250)
 }
 onMounted(() => {
+  // 清掉上个页面残留的播放会话（如 A 页暂停后切到本页），避免「继续」播到别页内容
+  if (ttsState.value.active) stopTTS()
   window.addEventListener('resize', onResize)
   window.addEventListener('orientationchange', onResize)
   buildEngineList()
@@ -204,11 +213,15 @@ onMounted(() => {
   window.addEventListener('kokoro-progress', onKokoroProgress)
 })
 onUnmounted(() => {
+  // 播放中/暂停中离开页面一律终止会话，防止串台
+  stopTTS()
+  flushProgress()
   window.removeEventListener('resize', onResize)
   window.removeEventListener('orientationchange', onResize)
   window.removeEventListener('gre-engines-updated', buildEngineList)
   window.removeEventListener('kokoro-progress', onKokoroProgress)
   clearTimeout(resizeTimer)
+  tracker.stop()
 })
 
 const favKey = 'gre-fav'
@@ -244,6 +257,26 @@ function speakAll() {
   playItems(items, { totalWords: list.length, track: true, speakMode: 'all' })
 }
 
+// 从第 n 个词续播（「继续上次学习」）
+function speakWordsFrom(n) {
+  const list = filtered.value
+  if (!list.length) return
+  const items = list.map((v, i) => ({ text: v.word, wordIndex: i }))
+  const start = items.findIndex((it) => it.wordIndex >= n)
+  playItems(items, { totalWords: list.length, track: true, speakMode: 'words', startIndex: start < 0 ? 0 : start })
+}
+
+// 进入页面/换课时：有历史位置且未完成 → 提示继续
+async function promptResume(lid) {
+  const n = await checkLessonResume(() => lid, userStore)
+  if (!n || bookType.value === 2) return // 阅读课由内嵌 ReadingView 处理
+  ElMessageBox.confirm(t('lesson.resumeBody', { n }), t('lesson.resumeTitle'), {
+    confirmButtonText: t('lesson.resumeYes'),
+    cancelButtonText: t('lesson.resumeNo'),
+    type: 'info'
+  }).then(() => speakWordsFrom(n)).catch(() => {})
+}
+
 function onLoopChange(mode) {
   setLoopMode(mode)
 }
@@ -270,6 +303,28 @@ async function loadBookLessons() {
     bookLessons.value = ls || []
   } catch (e) { /* ignore */ }
   return bookLessons.value
+}
+
+// ---- 上一课 / 下一课导航（按本书课时列表顺序） ----
+function navNeighbor(offset) {
+  const ls = bookLessons.value
+  const idx = ls.findIndex((l) => String(l.id) === String(route.params.id))
+  if (idx < 0) return null
+  return ls[idx + offset] || null
+}
+const prevLesson = computed(() => navNeighbor(-1))
+const nextLesson = computed(() => navNeighbor(1))
+function goNavLesson(l) {
+  stopTTS()
+  // 清掉可能的跨课续播标记，避免误触发自动播放
+  try { sessionStorage.removeItem('gre-book-loop') } catch (e) { /* ignore */ }
+  router.push(`/lessons/${l.id}`)
+  // 换课后回到页面顶部，避免停留在底部导航位置看新课内容
+  nextTick(() => {
+    const main = document.querySelector('.el-main')
+    if (main) main.scrollTop = 0
+    window.scrollTo(0, 0)
+  })
 }
 
 async function handleBookLoop() {
@@ -312,6 +367,7 @@ async function loadLesson(lid) {
     }
   } catch (e) { /* 公开接口 */ } finally { loading.value = false }
   refreshDone(lid)
+  promptResume(lid)
 }
 
 // 学习进度（服务端存储，电脑/手机跨端同步）
@@ -372,8 +428,8 @@ function toggleKnown(id) {
 }
 function isFav(id) { return favorites.value.has(id) }
 function toggleFav(v) {
-  if (favorites.value.has(v.id)) { favorites.value.delete(v.id); ElMessage.info('已取消收藏') }
-  else { favorites.value.add(v.id); ElMessage.success('已收藏：' + v.word) }
+  if (favorites.value.has(v.id)) { favorites.value.delete(v.id); ElMessage.info(t('lesson.unfavorited')) }
+  else { favorites.value.add(v.id); ElMessage.success(t('lesson.favorited') + v.word) }
   localStorage.setItem(favKey, JSON.stringify([...favorites.value]))
 }
 
@@ -389,6 +445,8 @@ onMounted(async () => {
 watch(
   () => route.params.id,
   async (newId) => {
+    // 组件复用（/lessons/:id 只变参数）不触发卸载，必须显式终止旧课会话
+    stopTTS()
     await loadLesson(newId)
     consumePendingAutoPlay(newId)
   }
@@ -401,7 +459,9 @@ onBookLoop(handleBookLoop)
 <style scoped>
 .topbar {
   position: sticky;
-  top: 0;
+  /* 吸顶点用负值抵消负 margin：sticky 的 top 按外边距盒对齐，
+     top:0 会让边框盒停在 18px 下方，滑动文字会从空隙穿出 */
+  top: -18px;
   z-index: 20;
   /* 负 margin 抵消 .el-main 的内边距，使控制条通栏贴顶、始终在屏幕顶部 */
   margin: -18px -18px 14px;
@@ -417,6 +477,9 @@ onBookLoop(handleBookLoop)
 .tts-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; padding: 8px 12px; background: var(--gre-surface); border: 1px solid var(--gre-border); border-radius: 8px; }
 .auto-scroll-toggle { margin-right: 4px; }
 .tts-status { font-size: 13px; color: var(--gre-primary); font-weight: 600; }
+.lesson-nav { display: flex; justify-content: space-between; gap: 12px; margin: 22px 0 8px; }
+.lesson-nav .el-button { min-width: 132px; }
+.lesson-nav-top { display: inline-flex; gap: 6px; margin-left: 10px; vertical-align: middle; }
 .done { opacity: .55; }
 .vocab-def-cn {
   font-size: 14px;
@@ -433,7 +496,7 @@ onBookLoop(handleBookLoop)
 }
 /* 小屏：.el-main 内边距为 12px，对应更小的负 margin 抵消 */
 @media (max-width: 768px) {
-  .topbar { margin: -12px -12px 10px; padding: 0 12px 0; }
+  .topbar { margin: -12px -12px 10px; padding: 0 12px 0; top: -12px; }
 
   /* 标题与工具分行，避免标题折行和工具按钮挤在一行 */
   .bar {

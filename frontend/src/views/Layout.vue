@@ -1,7 +1,7 @@
 <template>
   <el-container class="layout">
     <el-aside :width="effectiveCollapsed ? '64px' : '220px'" class="aside">
-      <div class="logo">{{ effectiveCollapsed ? '📚' : '📚 GRE 词汇' }}</div>
+      <div class="logo">{{ effectiveCollapsed ? '📚' : '📚 英语复读机' }}</div>
       <el-menu
         :default-active="activeMenu"
         router
@@ -9,18 +9,18 @@
         :collapse-transition="false"
         class="menu"
       >
-        <el-menu-item index="/home"><el-icon><HomeFilled/></el-icon><span>首页</span></el-menu-item>
-        <el-menu-item index="/lessons"><el-icon><Reading/></el-icon><span>课时目录</span></el-menu-item>
-        <el-menu-item index="/mine"><el-icon><User/></el-icon><span>我的</span></el-menu-item>
-        <el-menu-item index="/record-guide"><el-icon><Document/></el-icon><span>录制指引</span></el-menu-item>
-        <el-menu-item v-if="isAdmin" index="/admin/lessons"><el-icon><Setting/></el-icon><span>后台管理</span></el-menu-item>
-        <el-menu-item v-if="isAdmin" index="/admin/users"><el-icon><UserFilled/></el-icon><span>用户管理</span></el-menu-item>
+        <el-menu-item index="/home"><el-icon><HomeFilled/></el-icon><span>{{ $t('nav.home') }}</span></el-menu-item>
+        <el-menu-item index="/lessons"><el-icon><Reading/></el-icon><span>{{ $t('nav.lessons') }}</span></el-menu-item>
+        <el-menu-item index="/mine"><el-icon><User/></el-icon><span>{{ $t('nav.mine') }}</span></el-menu-item>
+        <el-menu-item index="/record-guide"><el-icon><Document/></el-icon><span>{{ $t('nav.guide') }}</span></el-menu-item>
+        <el-menu-item v-if="isAdmin" index="/admin/lessons"><el-icon><Setting/></el-icon><span>{{ $t('nav.admin') }}</span></el-menu-item>
+        <el-menu-item v-if="isAdmin" index="/admin/users"><el-icon><UserFilled/></el-icon><span>{{ $t('nav.users') }}</span></el-menu-item>
       </el-menu>
     </el-aside>
     <el-container>
       <el-header class="header">
         <div class="left">
-          <el-button text class="collapse-btn" @click="ui.toggleSidebar()" :title="effectiveCollapsed ? '展开菜单' : '收起菜单'">
+          <el-button text class="collapse-btn" @click="ui.toggleSidebar()" :title="effectiveCollapsed ? $t('nav.expand') : $t('nav.collapse')">
             <el-icon size="20"><component :is="effectiveCollapsed ? Expand : Fold"/></el-icon>
           </el-button>
           <span class="title">{{ $t('app.title') }}</span>
@@ -41,12 +41,12 @@
             round
             color="#ff6699"
             @click="backToMobile"
-          >📱 手机版</el-button>
-          <el-button text class="theme-btn" :title="ui.theme === 'dark' ? '切换到浅色' : '切换到深色'" @click="ui.toggleTheme()">
+          >📱 {{ $t('common.mobile') }}</el-button>
+          <el-button text class="theme-btn" :title="ui.theme === 'dark' ? $t('nav.toLight') : $t('nav.toDark')" @click="ui.toggleTheme()">
             <el-icon size="18"><component :is="ui.theme === 'dark' ? Sunny : Moon"/></el-icon>
           </el-button>
           <el-tag v-if="user" size="small" type="info">{{ user.nickname || user.username }}</el-tag>
-          <el-button text @click="logout">退出</el-button>
+          <el-button text @click="logout">{{ $t('nav.logout') }}</el-button>
         </div>
       </el-header>
       <el-main class="main">

@@ -2,169 +2,169 @@
   <div class="admin">
     <el-tabs v-model="tab">
       <!-- ===== PDF 导入 ===== -->
-      <el-tab-pane label="PDF 词汇导入" name="import">
+      <el-tab-pane :label="$t('admin.tabImport')" name="import">
         <el-alert type="info" :closable="false" show-icon style="margin-bottom:12px">
-          <template #title>导入流程</template>
-          1) 选择目标书本与 PDF 文件，点击「识别 PDF」；<br/>
-          2) 系统自动调用 <code>tools/ingest_pdf.py</code> 解析，把识别结果填入下方文本框；<br/>
-          3) 设置每课时词数，点击「导入」即按词数自动切分课时并入库（会重置所选书本内的旧课时和词汇）。
+          <template #title>{{ $t('admin.flowTitle') }}</template>
+          {{ $t('admin.flow1') }}<br/>
+          {{ $t('admin.flow2') }}<br/>
+          {{ $t('admin.flow3') }}
         </el-alert>
         <el-form :inline="true" style="margin-bottom:10px">
-          <el-form-item label="目标书本" required>
-            <el-select v-model="importBookId" placeholder="选择书本" style="width:220px" clearable>
+          <el-form-item :label="$t('lessons.pickBook')" required>
+            <el-select v-model="importBookId" :placeholder="$t('lessons.pickBookPh')" style="width:220px" clearable>
               <el-option v-for="b in books" :key="b.id" :label="b.title" :value="b.id" />
             </el-select>
           </el-form-item>
-          <el-form-item label="每课时词数">
+          <el-form-item :label="$t('admin.wordsPerLesson')">
             <el-input-number v-model="batchSize" :min="1" :max="500" />
           </el-form-item>
           <el-form-item>
             <input ref="pdfInput" type="file" accept="application/pdf" style="display:none" @change="onPdfSelected" />
-            <el-button :icon="Document" @click="$refs.pdfInput.click()">选择 PDF 文件</el-button>
-            <el-button type="primary" :loading="parsing" :disabled="!pdfFile" @click="parsePdf">识别 PDF</el-button>
-            <el-button type="success" :loading="importing" :disabled="!importBookId" @click="doImport">导入</el-button>
-            <el-button @click="loadSample">填入示例</el-button>
+            <el-button :icon="Document" @click="$refs.pdfInput.click()">{{ $t('admin.choosePdf') }}</el-button>
+            <el-button type="primary" :loading="parsing" :disabled="!pdfFile" @click="parsePdf">{{ $t('admin.parsePdf') }}</el-button>
+            <el-button type="success" :loading="importing" :disabled="!importBookId" @click="doImport">{{ $t('lessons.startImport') }}</el-button>
+            <el-button @click="loadSample">{{ $t('admin.fillSample') }}</el-button>
           </el-form-item>
-          <el-form-item label="已识别">
-            <el-tag>{{ parsedCount }} 条</el-tag>
+          <el-form-item :label="$t('admin.parsed')">
+            <el-tag>{{ $t('admin.parsedCount', { n: parsedCount }) }}</el-tag>
           </el-form-item>
         </el-form>
-        <el-input v-model="jsonText" type="textarea" :rows="14" placeholder='解析后的词汇 JSON 会出现在这里，格式：[{"word":"abase","phonetic":"E5beis","pos":"v","inflection":"abased; abasing","definition":"lower; degrade","example":"..."}]' />
+        <el-input v-model="jsonText" type="textarea" :rows="14" :placeholder="$t('admin.jsonPh')" />
       </el-tab-pane>
 
       <!-- ===== 书本管理 ===== -->
-      <el-tab-pane label="书本管理" name="books">
-        <el-button type="primary" style="margin-bottom:10px" @click="addBook">+ 新增书本</el-button>
+      <el-tab-pane :label="$t('admin.tabBooks')" name="books">
+        <el-button type="primary" style="margin-bottom:10px" @click="addBook">+ {{ $t('admin.addBook') }}</el-button>
         <el-table :data="books" border stripe>
           <el-table-column prop="sortNo" label="#" width="60" />
-          <el-table-column prop="title" label="书名" min-width="180" />
-          <el-table-column prop="description" label="说明" min-width="200" />
-          <el-table-column prop="bookType" label="类型" width="90">
+          <el-table-column prop="title" :label="$t('admin.colTitle')" min-width="180" />
+          <el-table-column prop="description" :label="$t('admin.colDesc')" min-width="200" />
+          <el-table-column prop="bookType" :label="$t('admin.colType')" width="90">
             <template #default="{ row }">
-              <template v-if="row.bookType === 2">阅读书</template>
-              <template v-else-if="row.bookType === 1">词汇书</template>
-              <template v-else><el-tag type="info" size="small">未设置</el-tag></template>
+              <template v-if="row.bookType === 2">{{ $t('admin.typeReading') }}</template>
+              <template v-else-if="row.bookType === 1">{{ $t('admin.typeVocab') }}</template>
+              <template v-else><el-tag type="info" size="small">{{ $t('admin.typeUnset') }}</el-tag></template>
             </template>
           </el-table-column>
-          <el-table-column label="范围" width="150">
+          <el-table-column :label="$t('admin.colScope')" width="150">
             <template #default="{ row }">
-              <el-tag v-if="row.isPublic === 1" type="success" size="small">公共书</el-tag>
-              <el-tag v-else type="warning" size="small">私有书</el-tag>
-              <el-tag v-if="row.browsePublic === 1" type="info" size="small" style="margin-left:4px">展示</el-tag>
+              <el-tag v-if="row.isPublic === 1" type="success" size="small">{{ $t('admin.scopePublic') }}</el-tag>
+              <el-tag v-else type="warning" size="small">{{ $t('admin.scopePrivate') }}</el-tag>
+              <el-tag v-if="row.browsePublic === 1" type="info" size="small" style="margin-left:4px">{{ $t('lessons.tagShowcase') }}</el-tag>
               <div v-if="row.ownerName" style="margin-top:4px;color:var(--gre-text-soft);font-size:12px">{{ row.ownerName }}</div>
             </template>
           </el-table-column>
-          <el-table-column prop="status" label="状态" width="80">
-            <template #default="{ row }">{{ row.status === 1 ? '发布' : '草稿' }}</template>
+          <el-table-column prop="status" :label="$t('users.status')" width="80">
+            <template #default="{ row }">{{ row.status === 1 ? $t('admin.statusPublished') : $t('admin.statusDraft') }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="160" fixed="right">
+          <el-table-column :label="$t('users.action')" width="160" fixed="right">
             <template #default="{ row }">
-              <el-button size="small" @click="editBook(row)">编辑</el-button>
-              <el-button size="small" type="danger" @click="delBook(row)">删除</el-button>
+              <el-button size="small" @click="editBook(row)">{{ $t('common.edit') }}</el-button>
+              <el-button size="small" type="danger" @click="delBook(row)">{{ $t('common.delete') }}</el-button>
             </template>
           </el-table-column>
         </el-table>
       </el-tab-pane>
 
       <!-- ===== 课时管理 ===== -->
-      <el-tab-pane label="课时管理" name="lessons">
+      <el-tab-pane :label="$t('admin.tabLessons')" name="lessons">
         <el-form :inline="true" style="margin-bottom:10px">
-          <el-form-item label="筛选书本">
-            <el-select v-model="lessonBookFilter" placeholder="全部书本" clearable style="width:220px" @change="reloadLessons">
+          <el-form-item :label="$t('admin.filterBook')">
+            <el-select v-model="lessonBookFilter" :placeholder="$t('admin.allBooksPh')" clearable style="width:220px" @change="reloadLessons">
               <el-option v-for="b in books" :key="b.id" :label="b.title" :value="b.id" />
             </el-select>
           </el-form-item>
         </el-form>
         <el-table :data="lessons" border stripe>
           <el-table-column prop="sortNo" label="#" width="60" />
-          <el-table-column prop="title" label="标题" min-width="180" />
-          <el-table-column label="所属书本" min-width="160">
+          <el-table-column prop="title" :label="$t('admin.colLessonTitle')" min-width="180" />
+          <el-table-column :label="$t('admin.colBelong')" min-width="160">
             <template #default="{ row }">
               <el-select v-model="row.bookId" size="small" style="width:160px" @change="(val) => assignBook(row, val)">
                 <el-option v-for="b in books" :key="b.id" :label="b.title" :value="b.id" />
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column prop="wordCount" label="词数" width="90" />
-          <el-table-column prop="description" label="说明" min-width="160" />
-          <el-table-column label="操作" width="160" fixed="right">
+          <el-table-column prop="wordCount" :label="$t('admin.colWordCount')" width="90" />
+          <el-table-column prop="description" :label="$t('admin.colDesc')" min-width="160" />
+          <el-table-column :label="$t('users.action')" width="160" fixed="right">
             <template #default="{ row }">
-              <el-button size="small" @click="editLesson(row)">编辑</el-button>
-              <el-button size="small" type="danger" @click="delLesson(row)">删除</el-button>
+              <el-button size="small" @click="editLesson(row)">{{ $t('common.edit') }}</el-button>
+              <el-button size="small" type="danger" @click="delLesson(row)">{{ $t('common.delete') }}</el-button>
             </template>
           </el-table-column>
         </el-table>
       </el-tab-pane>
 
       <!-- ===== TTS 设置 ===== -->
-      <el-tab-pane label="TTS 设置" name="tts">
-        <h4>引擎开关</h4>
+      <el-tab-pane :label="$t('admin.tabTts')" name="tts">
+        <h4>{{ $t('admin.engineSwitch') }}</h4>
         <el-table :data="ttsEngines" border stripe style="margin-bottom:20px">
           <el-table-column prop="sortNo" label="#" width="60" />
-          <el-table-column prop="name" label="引擎" min-width="180" />
-          <el-table-column prop="code" label="标识" width="120" />
-          <el-table-column label="状态" width="100">
+          <el-table-column prop="name" :label="$t('admin.colEngine')" min-width="180" />
+          <el-table-column prop="code" :label="$t('admin.colCode')" width="120" />
+          <el-table-column :label="$t('users.status')" width="100">
             <template #default="{ row }">
               <el-switch v-model="row.enabled" :active-value="1" :inactive-value="0" @change="(v) => toggleEngine(row, v)" />
             </template>
           </el-table-column>
         </el-table>
 
-        <h4>腾讯云 TTS 账号</h4>
-        <el-button type="primary" style="margin-bottom:10px" @click="addProvider">+ 新增账号</el-button>
+        <h4>{{ $t('admin.tencentAcc') }}</h4>
+        <el-button type="primary" style="margin-bottom:10px" @click="addProvider">+ {{ $t('admin.addProvider') }}</el-button>
         <el-table :data="ttsProviders" border stripe>
-          <el-table-column prop="provider" label="服务商" width="100" />
+          <el-table-column prop="provider" :label="$t('admin.colProvider')" width="100" />
           <el-table-column prop="appId" label="AppID" width="120" />
-          <el-table-column prop="region" label="区域" width="130" />
-          <el-table-column prop="endpoint" label="接入点" min-width="180" />
-          <el-table-column label="状态" width="90">
+          <el-table-column prop="region" :label="$t('admin.colRegion')" width="130" />
+          <el-table-column prop="endpoint" :label="$t('admin.colEndpoint')" min-width="180" />
+          <el-table-column :label="$t('users.status')" width="90">
             <template #default="{ row }">
               <el-switch v-model="row.enabled" :active-value="1" :inactive-value="0" @change="(v) => saveProviderStatus(row, v)" />
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="160" fixed="right">
+          <el-table-column :label="$t('users.action')" width="160" fixed="right">
             <template #default="{ row }">
-              <el-button size="small" @click="editProvider(row)">编辑</el-button>
-              <el-button size="small" type="danger" @click="delProvider(row)">删除</el-button>
+              <el-button size="small" @click="editProvider(row)">{{ $t('common.edit') }}</el-button>
+              <el-button size="small" type="danger" @click="delProvider(row)">{{ $t('common.delete') }}</el-button>
             </template>
           </el-table-column>
         </el-table>
 
-        <h4 style="margin-top:20px">当日用量监控</h4>
+        <h4 style="margin-top:20px">{{ $t('admin.usageMonitor') }}</h4>
         <el-form :inline="true">
-          <el-form-item label="服务商">
-            <el-select v-model="usageProvider" placeholder="选择" style="width:160px">
+          <el-form-item :label="$t('admin.colProvider')">
+            <el-select v-model="usageProvider" :placeholder="$t('admin.selectPh')" style="width:160px">
               <el-option label="tencent" value="tencent" />
             </el-select>
           </el-form-item>
           <el-form-item>
-            <el-button @click="loadUsage">查询</el-button>
+            <el-button @click="loadUsage">{{ $t('admin.query') }}</el-button>
           </el-form-item>
         </el-form>
         <div v-if="ttsUsage">
-          日期：{{ ttsUsage.usageDate }} &nbsp; 字符数：{{ ttsUsage.charCount }} &nbsp; 请求数：{{ ttsUsage.requestCount }} &nbsp; 限额：{{ ttsUsage.quota || '无限制' }}
+          {{ $t('admin.usageLine', { date: ttsUsage.usageDate, chars: ttsUsage.charCount, reqs: ttsUsage.requestCount, quota: ttsUsage.quota || $t('admin.noLimit') }) }}
           <el-form :inline="true" style="margin-top:8px">
-            <el-form-item label="设置当日限额（0=无限制）">
+            <el-form-item :label="$t('admin.setQuota')">
               <el-input-number v-model="quotaInput" :min="0" :step="1000" />
             </el-form-item>
             <el-form-item>
-              <el-button @click="saveQuota">保存限额</el-button>
+              <el-button @click="saveQuota">{{ $t('admin.saveQuota') }}</el-button>
             </el-form-item>
           </el-form>
         </div>
-        <el-empty v-else description="暂无用量数据" />
+        <el-empty v-else :description="$t('admin.noUsage')" />
       </el-tab-pane>
 
       <!-- ===== 阅读篇章对齐调整 ===== -->
-      <el-tab-pane label="阅读对齐" name="align">
+      <el-tab-pane :label="$t('admin.tabAlign')" name="align">
         <el-form :inline="true" style="margin-bottom:10px">
-          <el-form-item label="阅读书本">
-            <el-select v-model="alignBookId" placeholder="选择阅读书" clearable style="width:240px" @change="onAlignBookChange">
+          <el-form-item :label="$t('admin.alignBook')">
+            <el-select v-model="alignBookId" :placeholder="$t('admin.pickReadingPh')" clearable style="width:240px" @change="onAlignBookChange">
               <el-option v-for="b in readingBooks" :key="b.id" :label="b.title" :value="b.id" />
             </el-select>
           </el-form-item>
-          <el-form-item label="课时">
-            <el-select v-model="alignLessonId" placeholder="选择课时" clearable style="width:280px" @change="onAlignLessonChange">
+          <el-form-item :label="$t('admin.lessonLabel')">
+            <el-select v-model="alignLessonId" :placeholder="$t('admin.pickLessonPh')" clearable style="width:280px" @change="onAlignLessonChange">
               <el-option v-for="l in alignLessons" :key="l.id" :label="l.title" :value="l.id" />
             </el-select>
           </el-form-item>
@@ -175,50 +175,50 @@
           :lesson-id="alignLessonId"
           :lesson-title="alignLessonTitle"
         />
-        <el-empty v-else description="请先选择阅读书本与课时" />
+        <el-empty v-else :description="$t('admin.pickFirst')" />
       </el-tab-pane>
 
       <!-- ===== 词汇管理 ===== -->
-      <el-tab-pane label="词汇管理" name="vocabs">
+      <el-tab-pane :label="$t('admin.tabVocabs')" name="vocabs">
         <el-form :inline="true" style="margin-bottom:10px">
-          <el-form-item label="选择课时">
+          <el-form-item :label="$t('admin.pickLesson')">
             <el-select v-model="selLesson" placeholder="选择课时" style="width:280px" @change="loadVocabs">
               <el-option v-for="l in lessons" :key="l.id" :label="`${l.title}（${l.wordCount}词）`" :value="l.id" />
             </el-select>
           </el-form-item>
-          <el-form-item label="移动到" v-if="selLesson">
-            <el-select v-model="moveTo" placeholder="选择目标课时" style="width:240px">
+          <el-form-item :label="$t('admin.moveTo')" v-if="selLesson">
+            <el-select v-model="moveTo" :placeholder="$t('admin.pickTargetPh')" style="width:240px">
               <el-option v-for="l in lessons" :key="l.id" :label="l.title" :value="l.id" />
             </el-select>
           </el-form-item>
         </el-form>
         <el-table :data="vocabs" border stripe v-loading="vocabLoading">
-          <el-table-column label="单词" width="150">
+          <el-table-column :label="$t('admin.colWord')" width="150">
             <template #default="{ row }"><el-input v-model="row.word" size="small" /></template>
           </el-table-column>
-          <el-table-column label="音标(源)" width="120">
+          <el-table-column :label="$t('admin.colPhonetic')" width="120">
             <template #default="{ row }"><el-input v-model="row.phonetic" size="small" /></template>
           </el-table-column>
-          <el-table-column label="标准IPA" width="120">
+          <el-table-column :label="$t('admin.colIpa')" width="120">
             <template #default="{ row }"><el-input v-model="row.phoneticIpa" size="small" /></template>
           </el-table-column>
-          <el-table-column label="词性" width="80">
+          <el-table-column :label="$t('admin.colPos')" width="80">
             <template #default="{ row }"><el-input v-model="row.pos" size="small" /></template>
           </el-table-column>
-          <el-table-column label="变形" width="140">
+          <el-table-column :label="$t('admin.colInflection')" width="140">
             <template #default="{ row }"><el-input v-model="row.inflection" size="small" /></template>
           </el-table-column>
-          <el-table-column label="释义" min-width="180">
+          <el-table-column :label="$t('admin.colDef')" min-width="180">
             <template #default="{ row }"><el-input v-model="row.definition" size="small" /></template>
           </el-table-column>
-          <el-table-column label="例句" min-width="200">
+          <el-table-column :label="$t('admin.colExample')" min-width="200">
             <template #default="{ row }"><el-input v-model="row.example" size="small" type="textarea" :rows="1" /></template>
           </el-table-column>
-          <el-table-column label="操作" width="200" fixed="right">
+          <el-table-column :label="$t('users.action')" width="200" fixed="right">
             <template #default="{ row }">
-              <el-button size="small" type="primary" @click="saveVocab(row)">保存</el-button>
-              <el-button size="small" v-if="moveTo && moveTo !== selLesson" @click="moveVocab(row)">移动</el-button>
-              <el-button size="small" type="danger" @click="delVocab(row)">删除</el-button>
+              <el-button size="small" type="primary" @click="saveVocab(row)">{{ $t('common.save') }}</el-button>
+              <el-button size="small" v-if="moveTo && moveTo !== selLesson" @click="moveVocab(row)">{{ $t('admin.moveBtn') }}</el-button>
+              <el-button size="small" type="danger" @click="delVocab(row)">{{ $t('common.delete') }}</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -226,53 +226,53 @@
     </el-tabs>
 
     <!-- 课时编辑弹窗 -->
-    <el-dialog v-model="lessonDlg" title="编辑课时" width="420px">
+    <el-dialog v-model="lessonDlg" :title="$t('admin.editLessonTitle')" width="420px">
       <el-form label-width="80px">
-        <el-form-item label="标题"><el-input v-model="lessonForm.title" /></el-form-item>
-        <el-form-item label="所属书本">
-          <el-select v-model="lessonForm.bookId" placeholder="选择书本" style="width:100%">
+        <el-form-item :label="$t('admin.labelTitle')"><el-input v-model="lessonForm.title" /></el-form-item>
+        <el-form-item :label="$t('admin.colBelong')">
+          <el-select v-model="lessonForm.bookId" :placeholder="$t('lessons.pickBookPh')" style="width:100%">
             <el-option v-for="b in books" :key="b.id" :label="b.title" :value="b.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="序号"><el-input-number v-model="lessonForm.sortNo" :min="1" /></el-form-item>
-        <el-form-item label="说明"><el-input v-model="lessonForm.description" type="textarea" :rows="2" /></el-form-item>
+        <el-form-item :label="$t('admin.labelSort')"><el-input-number v-model="lessonForm.sortNo" :min="1" /></el-form-item>
+        <el-form-item :label="$t('admin.colDesc')"><el-input v-model="lessonForm.description" type="textarea" :rows="2" /></el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="lessonDlg = false">取消</el-button>
-        <el-button type="primary" @click="saveLesson">保存</el-button>
+        <el-button @click="lessonDlg = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="saveLesson">{{ $t('common.save') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 书本编辑弹窗 -->
-    <el-dialog v-model="bookDlg" title="书本" width="420px">
+    <el-dialog v-model="bookDlg" :title="$t('admin.bookDlgTitle')" width="420px">
       <el-form label-width="80px">
-        <el-form-item label="书名"><el-input v-model="bookForm.title" /></el-form-item>
-        <el-form-item label="序号"><el-input-number v-model="bookForm.sortNo" :min="0" /></el-form-item>
-        <el-form-item label="说明"><el-input v-model="bookForm.description" type="textarea" :rows="2" /></el-form-item>
-        <el-form-item label="类型">
+        <el-form-item :label="$t('admin.colTitle')"><el-input v-model="bookForm.title" /></el-form-item>
+        <el-form-item :label="$t('admin.labelSort')"><el-input-number v-model="bookForm.sortNo" :min="0" /></el-form-item>
+        <el-form-item :label="$t('admin.colDesc')"><el-input v-model="bookForm.description" type="textarea" :rows="2" /></el-form-item>
+        <el-form-item :label="$t('admin.colType')">
           <el-radio-group v-model="bookForm.bookType">
-            <el-radio :label="1">词汇书</el-radio>
-            <el-radio :label="2">阅读书</el-radio>
+            <el-radio :label="1">{{ $t('admin.typeVocab') }}</el-radio>
+            <el-radio :label="2">{{ $t('admin.typeReading') }}</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="状态">
+        <el-form-item :label="$t('users.status')">
           <el-radio-group v-model="bookForm.status">
-            <el-radio :label="1">发布</el-radio>
-            <el-radio :label="0">草稿</el-radio>
+            <el-radio :label="1">{{ $t('admin.statusPublished') }}</el-radio>
+            <el-radio :label="0">{{ $t('admin.statusDraft') }}</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="公开书">
-          <el-switch v-model="bookForm.isPublic" :active-value="1" :inactive-value="0" active-text="公开" inactive-text="私有" />
-          <span style="margin-left:8px;color:var(--gre-text-soft);font-size:12px">公开书所有人可见；私有书仅归属用户可见</span>
+        <el-form-item :label="$t('admin.labelPublic')">
+          <el-switch v-model="bookForm.isPublic" :active-value="1" :inactive-value="0" :active-text="$t('admin.publicOn')" :inactive-text="$t('admin.publicOff')" />
+          <span style="margin-left:8px;color:var(--gre-text-soft);font-size:12px">{{ $t('admin.publicHint') }}</span>
         </el-form-item>
-        <el-form-item v-if="bookForm.isPublic === 0" label="所有者">
+        <el-form-item v-if="bookForm.isPublic === 0" :label="$t('admin.labelOwner')">
           <el-select
             v-model="bookForm.userId"
             filterable
             remote
             clearable
             reserve-keyword
-            placeholder="输入用户名或昵称搜索"
+            :placeholder="$t('admin.ownerSearchPh')"
             :remote-method="searchOwners"
             :loading="ownerSearchLoading"
             style="width:260px"
@@ -284,43 +284,43 @@
               :value="u.id"
             />
           </el-select>
-          <span style="margin-left:8px;color:var(--gre-text-soft);font-size:12px">私有书归属的用户</span>
+          <span style="margin-left:8px;color:var(--gre-text-soft);font-size:12px">{{ $t('admin.ownerHint') }}</span>
         </el-form-item>
-        <el-form-item label="展示书">
+        <el-form-item :label="$t('admin.labelShowcase')">
           <el-switch v-model="bookForm.browsePublic" :active-value="1" :inactive-value="0" />
-          <span style="margin-left:8px;color:var(--gre-text-soft);font-size:12px">开启后未登录也能在目录中浏览</span>
+          <span style="margin-left:8px;color:var(--gre-text-soft);font-size:12px">{{ $t('admin.showcaseHint') }}</span>
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="bookDlg = false">取消</el-button>
-        <el-button type="primary" @click="saveBook">保存</el-button>
+        <el-button @click="bookDlg = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="saveBook">{{ $t('common.save') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- TTS 账号编辑弹窗 -->
-    <el-dialog v-model="ttsDlg" title="腾讯云 TTS 账号" width="520px">
+    <el-dialog v-model="ttsDlg" :title="$t('admin.tencentAcc')" width="520px">
       <el-form label-width="100px">
-        <el-form-item label="引擎标识">
+        <el-form-item :label="$t('admin.labelEngineCode')">
           <el-select v-model="ttsForm.engineCode" style="width:100%">
             <el-option label="tencent" value="tencent" />
           </el-select>
         </el-form-item>
-        <el-form-item label="AppID"><el-input v-model="ttsForm.appId" placeholder="腾讯云 AppID" /></el-form-item>
-        <el-form-item label="SecretId"><el-input v-model="ttsForm.secretId" placeholder="留空则保留原值" /></el-form-item>
-        <el-form-item label="SecretKey"><el-input v-model="ttsForm.secretKey" type="password" placeholder="留空则保留原值" show-password /></el-form-item>
+        <el-form-item label="AppID"><el-input v-model="ttsForm.appId" :placeholder="$t('admin.appIdPh')" /></el-form-item>
+        <el-form-item label="SecretId"><el-input v-model="ttsForm.secretId" :placeholder="$t('admin.keepBlank')" /></el-form-item>
+        <el-form-item label="SecretKey"><el-input v-model="ttsForm.secretKey" type="password" :placeholder="$t('admin.keepBlank')" show-password /></el-form-item>
         <el-form-item label="Region"><el-input v-model="ttsForm.region" /></el-form-item>
         <el-form-item label="Endpoint"><el-input v-model="ttsForm.endpoint" /></el-form-item>
-        <el-form-item label="额外配置(JSON)">
-          <el-input v-model="ttsForm.extraJson" type="textarea" :rows="3" placeholder='{"quota": 10000}  当日字符限额，0=无限制' />
+        <el-form-item :label="$t('admin.labelExtra')">
+          <el-input v-model="ttsForm.extraJson" type="textarea" :rows="3" :placeholder="$t('admin.extraPh')" />
         </el-form-item>
-        <el-form-item label="排序"><el-input-number v-model="ttsForm.sortNo" :min="0" /></el-form-item>
-        <el-form-item label="启用">
+        <el-form-item :label="$t('admin.labelSort')"><el-input-number v-model="ttsForm.sortNo" :min="0" /></el-form-item>
+        <el-form-item :label="$t('admin.labelEnable')">
           <el-switch v-model="ttsForm.enabled" :active-value="1" :inactive-value="0" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="ttsDlg = false">取消</el-button>
-        <el-button type="primary" @click="saveProvider">保存</el-button>
+        <el-button @click="ttsDlg = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="saveProvider">{{ $t('common.save') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -328,11 +328,13 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Document } from '@element-plus/icons-vue'
 import { adminApi, lessonApi } from '../api'
 import ReadingAlignEditor from './ReadingAlignEditor.vue'
 
+const { t } = useI18n()
 const tab = ref('import')
 const batchSize = ref(50)
 const jsonText = ref('')
@@ -407,24 +409,24 @@ function onPdfSelected(e) {
 }
 
 async function parsePdf() {
-  if (!pdfFile.value) return ElMessage.warning('请先选择 PDF 文件')
+  if (!pdfFile.value) return ElMessage.warning(t('admin.needPdf'))
   parsing.value = true
   try {
     const { data } = await adminApi.parsePdf(pdfFile.value)
     jsonText.value = JSON.stringify(data || [], null, 2)
-    ElMessage.success(`识别完成：${(data || []).length} 条词汇`)
+    ElMessage.success(t('admin.parseOk', { n: (data || []).length }))
   } finally { parsing.value = false }
 }
 
 async function doImport() {
-  if (!importBookId.value) return ElMessage.warning('请选择目标书本')
+  if (!importBookId.value) return ElMessage.warning(t('lessons.needTitle') === t('lessons.needTitle') ? t('admin.needBook') : t('admin.needBook'))
   let items
-  try { items = JSON.parse(jsonText.value) } catch (e) { return ElMessage.error('JSON 格式错误') }
-  if (!Array.isArray(items) || !items.length) return ElMessage.warning('请先粘贴或识别词汇 JSON')
+  try { items = JSON.parse(jsonText.value) } catch (e) { return ElMessage.error(t('admin.badJson')) }
+  if (!Array.isArray(items) || !items.length) return ElMessage.warning(t('admin.needJson'))
   importing.value = true
   try {
     const { data } = await adminApi.importVocabularies(batchSize.value, importBookId.value, items)
-    ElMessage.success(`导入成功：${data.lessonCount} 课时 / ${data.vocabCount} 词`)
+    ElMessage.success(t('lessons.importOk', { l: data.lessonCount, w: data.vocabCount }))
     tab.value = 'lessons'
     await reloadLessons()
   } catch (e) { /* interceptor 已提示 */ } finally { importing.value = false }
@@ -477,14 +479,14 @@ function editBook(row) {
 }
 async function saveBook() {
   await adminApi.saveBook(bookForm.value)
-  ElMessage.success('已保存')
+  ElMessage.success(t('common.saved'))
   bookDlg.value = false
   await reloadBooks()
 }
 async function delBook(row) {
-  await ElMessageBox.confirm(`确认删除书本「${row.title}」？其课时将变为未归属。`, '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('admin.delBookConfirm', { name: row.title }), t('admin.tip'), { type: 'warning' })
   await adminApi.removeBook(row.id)
-  ElMessage.success('已删除')
+  ElMessage.success(t('common.deleted'))
   await reloadBooks()
   await reloadLessons()
 }
@@ -495,19 +497,19 @@ async function editLesson(row) {
 }
 async function saveLesson() {
   await adminApi.saveLesson(lessonForm.value)
-  ElMessage.success('已保存')
+  ElMessage.success(t('common.saved'))
   lessonDlg.value = false
   await reloadLessons()
 }
 async function delLesson(row) {
-  await ElMessageBox.confirm(`确认删除「${row.title}」？该课时的词汇也会一并删除。`, '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('admin.delLessonConfirm', { name: row.title }), t('admin.tip'), { type: 'warning' })
   await adminApi.removeLesson(row.id)
-  ElMessage.success('已删除')
+  ElMessage.success(t('common.deleted'))
   await reloadLessons()
 }
 async function assignBook(row, bookId) {
   await adminApi.assignLessonBook(row.id, bookId)
-  ElMessage.success('已调整书本归属')
+  ElMessage.success(t('admin.movedOwner'))
   await reloadLessons()
 }
 
@@ -522,18 +524,18 @@ async function loadVocabs() {
 }
 async function saveVocab(row) {
   await adminApi.saveVocab(row)
-  ElMessage.success('已保存')
+  ElMessage.success(t('common.saved'))
 }
 async function moveVocab(row) {
   await adminApi.reassignVocab(row.id, moveTo.value, row.sortNo)
-  ElMessage.success('已移动')
+  ElMessage.success(t('admin.moved'))
   await loadVocabs()
   await reloadLessons()
 }
 async function delVocab(row) {
-  await ElMessageBox.confirm('确认删除该词汇？', '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('admin.delVocabConfirm'), t('admin.tip'), { type: 'warning' })
   await adminApi.removeVocab(row.id)
-  ElMessage.success('已删除')
+  ElMessage.success(t('common.deleted'))
   await loadVocabs()
   await reloadLessons()
 }
@@ -549,7 +551,7 @@ async function loadTtsProviders() {
 }
 async function toggleEngine(row, enabled) {
   await adminApi.setTtsEngineEnabled(row.id, enabled === 1)
-  ElMessage.success('已更新')
+  ElMessage.success(t('common.saved'))
   await loadTtsEngines()
 }
 
@@ -567,20 +569,20 @@ async function saveProvider() {
   if (!payload.secretId) delete payload.secretId
   if (!payload.secretKey) delete payload.secretKey
   await adminApi.saveTtsProvider(payload)
-  ElMessage.success('已保存')
+  ElMessage.success(t('common.saved'))
   ttsDlg.value = false
   await loadTtsProviders()
 }
 async function saveProviderStatus(row, enabled) {
   const payload = { ...row, enabled }
   await adminApi.saveTtsProvider(payload)
-  ElMessage.success('已更新')
+  ElMessage.success(t('common.saved'))
   await loadTtsProviders()
 }
 async function delProvider(row) {
   await ElMessageBox.confirm('确认删除该账号？', '提示', { type: 'warning' })
   await adminApi.removeTtsProvider(row.id)
-  ElMessage.success('已删除')
+  ElMessage.success(t('common.deleted'))
   await loadTtsProviders()
 }
 async function loadUsage() {

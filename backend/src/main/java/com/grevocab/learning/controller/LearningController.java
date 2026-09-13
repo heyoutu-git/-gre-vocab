@@ -39,6 +39,29 @@ public class LearningController {
         return Result.success(service.finishedCount(uid(r)));
     }
 
+    // 学习位置上报（自动进度，前端节流调用）：{ lessonId, wordIndex }
+    @PostMapping("/progress/visit")
+    public Result<Void> recordVisit(HttpServletRequest r, @RequestBody Map<String, Object> body) {
+        Long lessonId = Long.valueOf(String.valueOf(body.get("lessonId")));
+        Integer wordIndex = body.get("wordIndex") == null ? 0
+                : Integer.valueOf(String.valueOf(body.get("wordIndex")));
+        service.recordVisit(uid(r), lessonId, wordIndex);
+        return Result.success();
+    }
+
+    // 最近学的未完成一课（无记录返回 null），供「继续学习」提示
+    @GetMapping("/progress/resume")
+    public Result<com.grevocab.learning.entity.UserProgress> resume(HttpServletRequest r) {
+        return Result.success(service.resumeLesson(uid(r)));
+    }
+
+    // 单课时进度明细（含 last_word_index，供进入课时页的「继续上次」提示）
+    @GetMapping("/progress/detail")
+    public Result<com.grevocab.learning.entity.UserProgress> progressDetail(
+            HttpServletRequest r, @RequestParam Long lessonId) {
+        return Result.success(service.progressDetail(uid(r), lessonId));
+    }
+
     @PostMapping("/favorite")
     public Result<Void> addFav(HttpServletRequest r, @RequestBody Favorite f) {
         service.addFavorite(uid(r), f.getResType(), f.getResId());

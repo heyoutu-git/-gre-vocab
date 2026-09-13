@@ -29,6 +29,21 @@ public class LearningService {
         return mapper.finishedCount(userId);
     }
 
+    // 学习位置上报（自动进度）：登录后由前端节流调用
+    public void recordVisit(Long userId, Long lessonId, Integer wordIndex) {
+        mapper.upsertVisit(userId, lessonId, wordIndex == null ? 0 : wordIndex);
+    }
+
+    // 最近学的未完成一课（无记录返回 null）
+    public com.grevocab.learning.entity.UserProgress resumeLesson(Long userId) {
+        return mapper.findResume(userId);
+    }
+
+    // 单课时进度明细（含 last_word_index，供「继续上次学习」提示）
+    public com.grevocab.learning.entity.UserProgress progressDetail(Long userId, Long lessonId) {
+        return mapper.findProgress(userId, lessonId);
+    }
+
     public void addFavorite(Long userId, String resType, Long resId) {
         mapper.addFavorite(new Favorite() {{
             setUserId(userId); setResType(resType); setResId(resId);

@@ -26,6 +26,7 @@ backend/*.txt
 # 大体积离线 TTS 模型（约 150MB），不入库，见 README「模型资源下载」
 frontend/public/kokoro/
 frontend/public/kokoro-ort/
+frontend/public/piper/
 
 # ============ 通用 ============
 *.p12

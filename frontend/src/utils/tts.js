@@ -86,12 +86,16 @@ export async function refreshEngines() {
   try {
     const { data } = await ttsApi.engines()
     availableEngines = Array.isArray(data) ? data : []
+    // Piper（浏览器离线多语 TTS）为纯前端引擎，无需后端开关，客户端注入
+    if (!availableEngines.some((e) => e.code === 'piper')) {
+      availableEngines = [...availableEngines, { code: 'piper', name: 'Piper', enabled: 1 }]
+    }
     // 通知各页面引擎列表已就绪（页面 onMounted 早于本请求返回，需事件驱动刷新）
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('gre-engines-updated'))
     }
   } catch (e) {
-    availableEngines = []
+    availableEngines = [{ code: 'piper', name: 'Piper', enabled: 1 }]
     throw e
   }
 }
@@ -103,10 +107,12 @@ export function speechSupported() {
 export function isMespeakReady() { return mespeakReady }
 
 export function setEngine(e) {
-  if (['auto', 'system', 'mespeak', 'tencent', 'kokoro'].includes(e)) {
+  if (['auto', 'system', 'mespeak', 'tencent', 'kokoro', 'piper'].includes(e)) {
     engine = e
     // 仅离线优先路径预加载 92MB 语音包；服务器优先时由 playServerKokoro 失败兜底按需加载
     if ((e === 'kokoro' || e === 'auto') && kokoroOfflineFirst()) loadKokoro().catch(() => {})
+    // Piper 按需加载运行时（语音模型在首次播放具体语种时才拉取，这里仅预热 wasm 运行时）
+    if (e === 'piper') loadPiper().catch(() => {})
   }
 }
 
@@ -274,7 +280,9 @@ export function playItems(items, opts = {}) {
   cleanup()
   currentItems = list
   currentOpts = opts || {}
-  currentIndex = 0
+  // 支持从指定位置续播（「继续上次进度」）：负数/越界一律归零
+  const start = Number(opts.startIndex) || 0
+  currentIndex = (start > 0 && start < list.length) ? start : 0
   triedEngines = new Set() // 新一轮播放，重置已尝试引擎
   player.active = true
   player.paused = false
@@ -304,6 +312,7 @@ function playCurrent() {
   if (player.engine === 'mespeak') playMespeakItem(text, sid)
   else if (player.engine === 'tencent') playTencentItem(text, sid)
   else if (player.engine === 'kokoro') playKokoroItem(text, sid)
+  else if (player.engine === 'piper') playPiperItem(text, sid)
   else playSystemItem(text, sid)
 }
 
@@ -328,6 +337,8 @@ function playSystemItem(text, sid) {
   }
   ensureUnlockedSystem()
   if (!voicesReady) loadVoices()
+  // 系统语音包多为英文音；法/德/西/意文本自适应切到 Piper，避免英语音硬读
+  if (maybeRoutePiper(text, sid)) return
   const en = pickVoice()
   const u = new SpeechSynthesisUtterance(text)
   u.lang = (en && en.lang) || 'en-US'
@@ -496,6 +507,8 @@ export function getKokoroState() {
 function playKokoroItem(text, sid) {
   // kokoro 当前仅支持英文；中文文本直接回退，避免用英文音色乱读
   if (isCJK(text)) { fallbackToNonKokoro(text, sid); return }
+  // 法/德/西/意等语种自适应路由到 Piper（多语离线引擎），kokoro 英语音色读外语会失真
+  if (maybeRoutePiper(text, sid)) return
   // 手机默认服务器优先：188 本机推理秒级真人音，不受手机端 92MB 模型/wasm 制约
   if (!kokoroOfflineFirst()) { playServerKokoro(text, sid, true); return }
   // 桌面离线优先：浏览器 wasm 推理（已实测音质正常），失败回服务器合成
@@ -575,6 +588,114 @@ async function doPlayKokoro(text, sid, retried) {
   }
 }
 
+// ---- Piper 离线多语 TTS（浏览器 WASM 推理，自适应法/德/西/意等语种）----
+// 运行时资源本地托管：public/piper/{piper_phonemize.*, onnx/}，语音模型 public/piper/models/{lang}/
+// 语种→音色映射：新增语种只需下载模型文件到 models/{lang}/ 并在此登记
+const PIPER_LANGS = {
+  fr: 'fr_FR-siwis-medium',
+  de: 'de_DE-thorsten-medium',
+  es: 'es_ES-sharvard-medium',
+  it: 'it_IT-paola-medium',
+}
+// 语种启发式识别：按各语种特征字符计分（纯 ASCII 外语词无法识别，会走英文引擎）
+const PIPER_DISTINCT = [
+  ['de', /[äöüßÄÖÜ]/g],
+  ['es', /[ñ¿¡ÑÁÉÍÓÚÜáéíóúü]/g],
+  ['it', /[àèìòùÀÈÌÒÙ]/g],
+  ['fr', /[àâæçéèêëîïôœùûüÿÀÂÆÇÉÈÊËÎÏÔŒÙÛÜŸ]/g],
+]
+function detectPiperLang(text) {
+  if (!text) return null
+  let best = null, bestScore = 0
+  for (const [lang, re] of PIPER_DISTINCT) {
+    const n = (String(text).match(re) || []).length
+    if (n > bestScore) { bestScore = n; best = lang }
+  }
+  return bestScore >= 1 ? best : null
+}
+
+let piperReady = false
+let piperLoading = false
+let piperEngine = null
+let piperError = null
+
+async function loadPiper() {
+  if (piperReady || piperLoading || typeof window === 'undefined') return piperReady
+  piperLoading = true
+  piperError = null
+  try {
+    const mod = await import('piper-tts-web')
+    const { PiperWebEngine, OnnxWebRuntime, PhonemizeWebRuntime, RemoteVoiceProvider } = mod
+    piperEngine = new PiperWebEngine({
+      // onnxruntime-web 的 wasm 与音素化 wasm 全部走本地静态目录（离线可用）
+      onnxRuntime: new OnnxWebRuntime({ basePath: BASE_URL + 'piper/onnx/' }),
+      phonemizeRuntime: new PhonemizeWebRuntime({ basePath: BASE_URL + 'piper/' }),
+      // 语音模型从本地 /piper/models/ 拉取（默认 HF 远端在内网不可用）
+      voiceProvider: new RemoteVoiceProvider({ baseUrl: BASE_URL + 'piper/models/' }),
+    })
+    if (!piperEngine) throw new Error('piper load failed')
+    piperReady = true
+    return true
+  } catch (e) {
+    piperError = e
+    piperReady = false
+    piperEngine = null
+    return false
+  } finally {
+    piperLoading = false
+  }
+}
+
+// 自动路由：文本属于 Piper 支持的语种且引擎可用 → 切到 piper 播放（返回 true 表示已接管）
+function maybeRoutePiper(text, sid) {
+  if (!isEngineEnabled('piper') || triedEngines.has('piper')) return false
+  if (isCJK(text)) return false
+  if (!detectPiperLang(text)) return false
+  player.engine = 'piper'
+  emitState()
+  playPiperItem(text, sid)
+  return true
+}
+
+function playPiperItem(text, sid) {
+  const lang = detectPiperLang(text)
+  const voice = lang && PIPER_LANGS[lang]
+  if (!voice) { fallbackAndPlay(text, sid); return }
+  if (piperReady && piperEngine) { doPlayPiper(text, sid, voice); return }
+  if (piperError) { fallbackAndPlay(text, sid); return }
+  // 运行时（wasm 约 50MB）尚未就绪，等待加载完成后再播
+  let tries = 0
+  const t = setInterval(() => {
+    if (sid !== sessionId) { clearInterval(t); return }
+    if (piperReady && piperEngine) { clearInterval(t); doPlayPiper(text, sid, voice); return }
+    if (piperError || ++tries > 240) { clearInterval(t); fallbackAndPlay(text, sid); return }
+    loadPiper().catch(() => {})
+  }, 500)
+}
+
+async function doPlayPiper(text, sid, voice) {
+  try {
+    const resp = await piperEngine.generate(String(text), voice, 0)
+    if (sid !== sessionId) return
+    if (!resp || !resp.file) { fallbackAndPlay(text, sid); return }
+    player.detail = 'piperVoice'
+    emitState()
+    const url = URL.createObjectURL(resp.file)
+    const a = new Audio(url)
+    audioEl = a
+    a.onended = () => { if (sid === sessionId && !player.paused) { URL.revokeObjectURL(url); advance(sid) } }
+    a.onerror = () => { if (sid === sessionId && !player.paused) fallbackAndPlay(text, sid) }
+    const p = a.play()
+    if (p && p.catch) p.catch(() => { if (sid === sessionId && !player.paused) fallbackAndPlay(text, sid) })
+  } catch (e) {
+    if (sid === sessionId && !player.paused) fallbackAndPlay(text, sid)
+  }
+}
+
+export function getPiperState() {
+  return { ready: piperReady, loading: piperLoading, error: piperError, langs: Object.keys(PIPER_LANGS) }
+}
+
 function playTencentItem(text, sid) {
   ttsApi.tencentSynthesize(text)
     .then((res) => {
@@ -601,7 +722,7 @@ function playTencentItem(text, sid) {
 
 export function pauseTTS() {
   if (!player.active || player.paused) return
-  if (player.engine === 'kokoro' || player.engine === 'mespeak' || player.engine === 'tencent') {
+  if (player.engine === 'kokoro' || player.engine === 'mespeak' || player.engine === 'tencent' || player.engine === 'piper') {
     if (audioEl) { try { audioEl.pause() } catch (e) { /* ignore */ } }
   } else if (speechSupported()) {
     try { window.speechSynthesis.pause() } catch (e) { /* ignore */ }
@@ -612,7 +733,7 @@ export function pauseTTS() {
 
 export function resumeTTS() {
   if (!player.active || !player.paused) return
-  if (player.engine === 'kokoro' || player.engine === 'mespeak' || player.engine === 'tencent') {
+  if (player.engine === 'kokoro' || player.engine === 'mespeak' || player.engine === 'tencent' || player.engine === 'piper') {
     if (audioEl) { const p = audioEl.play(); if (p && p.catch) p.catch(() => {}) }
   } else if (speechSupported()) {
     try { window.speechSynthesis.resume() } catch (e) { /* ignore */ }
