@@ -11,7 +11,6 @@ export default {
     needCaptcha: 'Veuillez saisir le captcha', captchaRefresh: 'Touchez pour actualiser', okLogin: 'Connecté',
     privacyText: 'Nous utilisons les informations de compte uniquement pour le service d\'apprentissage et ne les partageons jamais avec des tiers. En vous inscrivant, vous acceptez ce traitement.',
     okRegister: 'Inscription réussie. Vous pourrez vous connecter après validation par l\'administrateur.', reviewTip: 'Les nouveaux comptes nécessitent la validation de l\'administrateur',
-    devTip: 'Administrateur par défaut : admin / admin123 (dev uniquement)'
   },
   lesson: {
 noMatch: 'Aucun mot correspondant', unfavorited: 'Retiré des favoris', favorited: 'Ajouté aux favoris : ',
@@ -43,6 +42,7 @@ tagReading: 'Lecture', tagMine: 'À moi', tagShowcase: 'Vitrine', tagPublic: 'Pu
     settingsTitle: 'Réglages du livre & plan d\'étude',
     readingNoPlan: 'Les livres de lecture ne prennent pas en charge le plan de vocabulaire',
     readingNoPlanDesc: 'Ce livre ne contient que des passages de lecture. Ouvrez une leçon pour suivre votre progression.',
+    planUserScope: 'Votre plan d\'étude vous est propre et n\'affecte pas les autres utilisateurs.',
     resplitBtn: 'Redécouper les leçons', planSection: 'Plan d\'étude', dailyGoal: 'Objectif quotidien',
     startDate: 'Date de début', endDate: 'Date de fin', expectedFinish: 'Fin prévue', noGoal: 'Aucun objectif',
     resplitOk: 'Redécoupé à {n} mots/leçon : {l} leçons',
@@ -76,6 +76,7 @@ account: 'Compte : ', role: 'Rôle : ', ttsHelp: 'À propos de la synthèse voca
     search: 'Rechercher pseudo / téléphone', id: 'ID', username: 'Nom d\'utilisateur', nickname: 'Pseudo', phone: 'Téléphone',
     regAddr: 'IP:port d\'inscription', regTime: 'Date d\'inscription', status: 'Statut', action: 'Actions',
     approve: 'Approuver', reject: 'Refuser', disable: 'Désactiver', enable: 'Activer', confirm: 'Confirmer', confirmMsg: 'Appliquer « {action} » à l\'utilisateur « {name} » ?', ok: 'Effectué',
+    resetPwd: 'Réinitialiser', resetPwdConfirm: 'Réinitialiser le mot de passe de "{name}" au mot de passe par défaut 123456 ? Rappelez-lui de le modifier après connexion.', resetPwdOk: 'Mot de passe de "{name}" réinitialisé à 123456',
     noReg: '—', empty: 'Aucun utilisateur'
   },
   common: { searchBtn: 'Rechercher', cancel: 'Annuler', save: 'Enregistrer', saved: 'Enregistré', close: 'Fermer', delete: 'Supprimer', deleted: 'Supprimé', edit: 'Modifier', mobile: '📱 Mobile', desktop: '💻 Bureau' },
@@ -117,6 +118,14 @@ account: 'Compte : ', role: 'Rôle : ', ttsHelp: 'À propos de la synthèse voca
     tip: 'Avis',
     delLessonConfirm: 'Supprimer « {name} » ? Les mots de la leçon seront aussi supprimés.',
     movedOwner: 'Propriétaire mis à jour', moved: 'Déplacé', delVocabConfirm: 'Supprimer ce mot ?',
-    jsonPh: 'Le JSON analysé apparaît ici, format : [{"word":"abase", ...}]'
+    jsonPh: 'Le JSON analysé apparaît ici, format : [{"word":"abase", ...}]',
+    tabKokoro: 'Service vocal',
+    kokoroHealth: 'État du service', kokoroHealthy: 'En marche', kokoroDown: 'Indisponible',
+    kokoroCheckAt: 'Dernière vérif.', kokoroFailCount: 'Échecs consécutifs',
+    kokoroAutoRestart: 'Redémarrages auto', kokoroLastRestart: 'Dernier redémarrage auto',
+    kokoroLastAction: 'Dernière action manuelle', kokoroWatchdogTip: 'Le watchdog vérifie le service local toutes les 60 s et le relance après 2 échecs consécutifs (3 min de refroidissement). Démarrage/arrêt/redémarrage manuel possible ici.',
+    kokoroProbe: 'Vérifier', kokoroStart: 'Démarrer', kokoroStop: 'Arrêter', kokoroRestart: 'Redémarrer',
+    kokoroOpConfirm: 'Confirmer "{op}" du moteur vocal ? Lors de l\'arrêt, la lecture en ligne utilise la synthèse du navigateur.',
+    kokoroOpOk: '"{op}" exécuté', kokoroOpFail: 'Échec, réessayez plus tard'
   }
 }

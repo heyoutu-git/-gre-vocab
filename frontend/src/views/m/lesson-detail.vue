@@ -252,8 +252,9 @@ function playWordsFrom(n) {
 }
 
 // 进入页面/换课时：有历史位置且未完成 → 提示继续
-async function promptResume(lid) {
-  const n = await checkLessonResume(() => lid, userStore)
+// prompt=false：页内跳课（上一课/下一课）只静默记录访问，不弹窗
+async function promptResume(lid, prompt = true) {
+  const n = await checkLessonResume(() => lid, userStore, prompt)
   if (!n || bookType.value === 2) return // 阅读课由内嵌 ReadingView 处理
   showConfirmDialog({
     title: t('lesson.resumeTitle'),
@@ -394,13 +395,14 @@ function consumePendingAutoPlay(lid) {
 watch(() => route.params.id, async (newId) => {
   // 组件复用（/m/lesson/:id 只变参数）不触发卸载，必须显式终止旧课会话
   stopTTS()
-  await loadLesson(newId)
+  // prompt=false：页内跳课不弹「继续上次学习」
+  await loadLesson(newId, false)
   consumePendingAutoPlay(newId)
 })
 // 注册本书循环处理器
 onBookLoop(handleBookLoop)
 
-async function loadLesson(lid) {
+async function loadLesson(lid, prompt = true) {
   loading.value = true
   try {
     const [l, vs] = await Promise.all([lessonApi.get(lid), lessonApi.vocabularies(lid)])
@@ -418,7 +420,7 @@ async function loadLesson(lid) {
   } catch (e) { vocabs.value = [] }
   finally { loading.value = false }
   refreshDone(lid)
-  promptResume(lid)
+  promptResume(lid, prompt)
 }
 
 // ---- 上一课 / 下一课导航（按本书课时列表顺序） ----

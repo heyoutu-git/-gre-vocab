@@ -9,30 +9,36 @@
       </div>
     </div>
 
-    <!-- 书本选择 -->
-    <div class="book-list">
+    <!-- 书本选择：封面网格 -->
+    <div class="book-grid">
       <div
         v-for="b in bookOptions"
-        :key="b.id"
+        :key="b.id ?? 'all'"
         class="book-card"
         :class="{ active: selectedBook === b.id }"
         @click="selectBook(b.id)"
       >
-        <div class="book-title">{{ b.title }}</div>
-        <el-tag v-if="b.bookType === 2" size="small" type="primary" effect="plain" style="margin-right:4px">{{ $t('lessons.tagReading') }}</el-tag>
-        <el-tag v-if="b.mine" size="small" type="warning" effect="plain">{{ $t('lessons.tagMine') }}</el-tag>
-        <el-tag v-else-if="b.browsePublic" size="small" type="success" effect="plain">{{ $t('lessons.tagShowcase') }}</el-tag>
-        <el-tag v-else size="small" type="info" effect="plain">{{ $t('lessons.tagPublic') }}</el-tag>
-        <div class="book-meta">{{ $t('lessons.totalWordsOf', { n: planOf(b.id)?.totalWords || 0 }) }}</div>
-        <el-progress
-          v-if="planOf(b.id)"
-          :percentage="planOf(b.id).percent"
-          :stroke-width="6"
-          style="margin-top:6px"
-        />
-        <div class="book-actions" v-if="b.mine" @click.stop>
-          <el-button size="small" text type="primary" @click="openSettings(b)">{{ $t('lessons.settingsPlan') }}</el-button>
-          <el-button size="small" text type="danger" @click="removeBook(b)">{{ $t('common.delete') }}</el-button>
+        <BookCover :title="b.title" :all="b.id === null" />
+        <div class="bc-body">
+          <div class="bc-title" :title="b.title">{{ b.title }}</div>
+          <div class="bc-tags">
+            <el-tag v-if="b.bookType === 2" size="small" type="primary" effect="plain">{{ $t('lessons.tagReading') }}</el-tag>
+            <el-tag v-if="b.mine" size="small" type="warning" effect="plain">{{ $t('lessons.tagMine') }}</el-tag>
+            <el-tag v-else-if="b.browsePublic" size="small" type="success" effect="plain">{{ $t('lessons.tagShowcase') }}</el-tag>
+            <el-tag v-else size="small" type="info" effect="plain">{{ $t('lessons.tagPublic') }}</el-tag>
+            <span class="bc-words">{{ $t('lessons.totalWordsOf', { n: planOf(b.id)?.totalWords || 0 }) }}</span>
+          </div>
+          <el-progress
+            v-if="planOf(b.id)"
+            :percentage="planOf(b.id).percent"
+            :stroke-width="4"
+            :show-text="false"
+          />
+          <div class="bc-actions" v-if="userStore.isLogin && (b.mine || b.bookType !== 2)" @click.stop>
+            <!-- 学习计划：登录用户对任何词汇书都可设自己的计划；重切分/删除仍限书主 -->
+            <el-button v-if="b.bookType !== 2" size="small" text type="primary" @click="openSettings(b)">{{ $t('lessons.settingsPlan') }}</el-button>
+            <el-button v-if="b.mine" size="small" text type="danger" @click="removeBook(b)">{{ $t('common.delete') }}</el-button>
+          </div>
         </div>
       </div>
     </div>
@@ -47,15 +53,17 @@
       style="margin-bottom:16px"
     />
     <el-empty v-if="!loading && !filtered.length" :description="userStore.isLogin ? $t('lessons.emptyOwner') : $t('lessons.emptyAnon')" />
-    <el-row v-else :gutter="16">
-      <el-col v-for="l in filtered" :key="l.id" :xs="24" :sm="12" :md="8" :lg="6">
-        <el-card class="lesson-card" shadow="hover" @click="open(l)">
-          <div class="title">{{ l.title }}</div>
-          <div class="meta">{{ l.wordCount }} {{ $t('lessons.words') }}</div>
-          <div class="desc">{{ l.description }}</div>
-        </el-card>
-      </el-col>
-    </el-row>
+    <div v-else class="lesson-grid">
+      <div v-for="(l, i) in filtered" :key="l.id" class="lesson-item" :title="l.description || l.title" @click="open(l)">
+        <div class="lesson-num">{{ String(i + 1).padStart(2, '0') }}</div>
+        <div class="li-body">
+          <div class="li-title">{{ l.title }}</div>
+          <div class="li-meta">
+            <span class="li-words">{{ l.wordCount }} {{ $t('lessons.words') }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- 上传书本对话框 -->
     <el-dialog v-model="uploadVisible" :title="$t('lessons.uploadDialogTitle')" width="480px">
@@ -96,7 +104,7 @@
         <el-form label-width="96px">
           <el-form-item :label="$t('lessons.bookName')">
             <span>{{ current.title }}</span>
-            <el-tag size="small" type="warning" effect="plain" style="margin-left:8px">{{ $t('lessons.tagMine') }}</el-tag>
+            <el-tag v-if="current.mine" size="small" type="warning" effect="plain" style="margin-left:8px">{{ $t('lessons.tagMine') }}</el-tag>
           </el-form-item>
         </el-form>
 
@@ -114,7 +122,8 @@
         <!-- 词汇书：正常显示计划 -->
         <template v-else>
           <el-form label-width="96px">
-            <el-form-item :label="$t('lessons.wordsPerLesson')">
+            <!-- 每课词数影响课时切分，仅书主可改 -->
+            <el-form-item v-if="current.mine" :label="$t('lessons.wordsPerLesson')">
               <el-input-number v-model="planForm.wordsPerLesson" :min="1" :max="500" />
               <el-button style="margin-left:8px" :loading="resplitting" @click="doResplit">{{ $t('lessons.resplitBtn') }}</el-button>
             </el-form-item>
@@ -129,6 +138,15 @@
               <el-date-picker v-model="planForm.endDate" type="date" value-format="YYYY-MM-DD" :placeholder="$t('lessons.endDate')" />
             </el-form-item>
           </el-form>
+          <!-- 非书主提示：计划只影响自己 -->
+          <el-alert
+            v-if="!current.mine"
+            :title="$t('lessons.planUserScope')"
+            type="info"
+            :closable="false"
+            show-icon
+            style="margin-top:4px"
+          />
 
           <el-card class="plan-card" shadow="never">
             <div class="plan-row"><span>{{ $t('lessons.progressTotal') }}</span><b>{{ plan.totalWords }}</b></div>
@@ -248,10 +266,11 @@ const planForm = reactive({ wordsPerLesson: 50, dailyGoal: null, startDate: null
 function openSettings(b) {
   current.value = b
   planForm.wordsPerLesson = b.wordsPerLesson || 50
-  planForm.dailyGoal = b.planDailyWords || null
-  planForm.startDate = b.planStartDate || null
-  planForm.endDate = b.planEndDate || null
+  // 计划从「我在这本书上的计划」初始化（后端已按当前用户返回）
   const p = plans.value[b.id]
+  planForm.dailyGoal = (p && p.dailyGoal) || b.planDailyWords || null
+  planForm.startDate = (p && p.startDate) || b.planStartDate || null
+  planForm.endDate = (p && p.endDate) || b.planEndDate || null
   if (p) Object.assign(plan, p)
   settingsVisible.value = true
 }
@@ -260,8 +279,9 @@ async function savePlan() {
   if (!current.value) return
   saving.value = true
   try {
+    // 非书主不传每课词数（书级设置仅书主可改）
     await bookApi.updatePlan(current.value.id, {
-      wordsPerLesson: planForm.wordsPerLesson,
+      wordsPerLesson: current.value.mine ? planForm.wordsPerLesson : null,
       planDailyWords: planForm.dailyGoal,
       planStartDate: planForm.startDate,
       planEndDate: planForm.endDate
@@ -320,39 +340,130 @@ onMounted(async () => {
 .bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
 .bar h2 { margin: 0; }
 
-.book-list {
-  display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  padding-bottom: 12px;
+/* 书架网格：自动换行，无需横向滚动 */
+.book-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(252px, 1fr));
+  gap: 10px;
   margin-bottom: 16px;
 }
 .book-card {
-  min-width: 175px;
-  max-width: 220px;
-  flex: 0 0 auto;
-  padding: 14px 16px;
-  border: 1px solid var(--el-border-color);
-  border-radius: 8px;
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 10px;
   cursor: pointer;
-  transition: all .2s;
+  transition: all .18s;
   background: #fff;
 }
-.book-card:hover { border-color: var(--gre-primary); }
+.book-card:hover {
+  border-color: var(--gre-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(79, 109, 245, .13);
+}
 .book-card.active {
   border-color: var(--gre-primary);
   background: linear-gradient(135deg, #eef2ff, #f5f7ff);
-  box-shadow: 0 2px 8px rgba(79, 109, 245, .12);
+  box-shadow: 0 2px 10px rgba(79, 109, 245, .16);
 }
-.book-title { font-weight: 700; color: var(--gre-text); font-size: 15px; }
-.book-meta { color: var(--gre-text-soft); font-size: 12px; margin-top: 6px; }
-.book-actions { margin-top: 8px; display: flex; gap: 4px; }
+.bc-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.bc-title {
+  font-weight: 700;
+  color: var(--gre-text);
+  font-size: 14px;
+  line-height: 1.35;
+  /* 固定两行高度，卡片对齐 */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.7em;
+}
+.bc-tags {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.bc-words {
+  margin-left: auto;
+  color: var(--gre-text-soft);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.bc-actions { display: flex; gap: 4px; margin-top: -2px; }
+.bc-actions .el-button { margin: 0; padding: 4px 6px; }
 .hint { color: var(--gre-text-soft); font-size: 12px; margin-left: 8px; }
 
-.lesson-card { margin-bottom: 4px; }
-.title { font-weight: 700; color: var(--gre-text); }
-.meta { color: var(--gre-primary); font-size: .82rem; margin-top: 4px; }
-.desc { color: var(--gre-text-soft); font-size: .8rem; margin-top: 6px; line-height: 1.5; }
+/* 课时网格：自动换行，无需横向滚动 */
+.lesson-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(225px, 1fr));
+  gap: 12px;
+}
+.lesson-item {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background: var(--gre-surface, #fff);
+  border: 1px solid var(--gre-border, #e6e9ef);
+  border-radius: 12px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+/* 左侧主色竖条：默认隐形，悬停浮现 */
+.lesson-item::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--gre-primary, #4f6df5);
+  opacity: 0;
+  transition: opacity .16s ease;
+}
+.lesson-item:hover {
+  transform: translateY(-3px);
+  border-color: var(--gre-primary, #4f6df5);
+  box-shadow: 0 6px 18px rgba(79, 109, 245, .13);
+}
+.lesson-item:hover::before { opacity: 1; }
+.lesson-num {
+  flex: 0 0 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gre-primary-soft, #eef1fe);
+  color: var(--gre-primary, #4f6df5);
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: .5px;
+  transition: background .16s ease, color .16s ease;
+}
+.lesson-item:hover .lesson-num { background: var(--gre-primary, #4f6df5); color: #fff; }
+.li-body { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+.li-title {
+  font-weight: 600;
+  color: var(--gre-text, #1f2d3d);
+  font-size: 14px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.li-meta { display: flex; align-items: center; gap: 8px; }
+.li-words { color: var(--gre-text-soft, #5b6b7f); font-size: 12px; }
 
 .plan-card { margin-top: 12px; background: #f8faff; }
 .plan-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 14px; color: var(--gre-text); }

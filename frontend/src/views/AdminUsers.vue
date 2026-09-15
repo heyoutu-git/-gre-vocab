@@ -37,7 +37,7 @@
           <el-tag v-else type="danger">{{ $t('users.disabled') }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column :label="$t('users.action')" width="240" fixed="right">
+      <el-table-column :label="$t('users.action')" width="320" fixed="right">
         <template #default="{ row }">
           <template v-if="row.status === 2">
             <el-button size="small" type="success" @click="setStatus(row, 1)">{{ $t('users.approve') }}</el-button>
@@ -45,6 +45,7 @@
           </template>
           <el-button v-if="row.status === 1" size="small" type="danger" @click="setStatus(row, 0)">{{ $t('users.disable') }}</el-button>
           <el-button v-if="row.status === 0 || row.status === 3" size="small" type="success" @click="setStatus(row, 1)">{{ $t('users.enable') }}</el-button>
+          <el-button size="small" type="warning" plain @click="resetPwd(row)">{{ $t('users.resetPwd') }}</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -92,6 +93,21 @@ async function setStatus(row, status) {
     ElMessage.success(t('users.ok'))
     load()
     afterReview()
+  } catch (e) { /* http 拦截器已提示 */ }
+}
+
+// 重置密码为默认密码 123456（用户登录后应自行修改）
+async function resetPwd(row) {
+  try {
+    await ElMessageBox.confirm(t('users.resetPwdConfirm', { name: row.username }), t('users.resetPwd'), {
+      type: 'warning',
+      confirmButtonText: t('users.confirm'),
+      cancelButtonText: t('common.cancel')
+    })
+  } catch (e) { return }
+  try {
+    await adminApi.resetUserPassword(row.id)
+    ElMessage.success(t('users.resetPwdOk', { name: row.username }))
   } catch (e) { /* http 拦截器已提示 */ }
 }
 

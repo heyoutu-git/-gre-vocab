@@ -30,6 +30,22 @@ public class KokoroServerTtsService {
     }
 
     /**
+     * 健康探测：GET /health，2 秒超时。服务在跑返回 true。
+     */
+    public boolean isHealthy() {
+        try {
+            HttpRequest req = HttpRequest.newBuilder(URI.create(baseUrl + "/health"))
+                    .timeout(Duration.ofSeconds(2))
+                    .GET()
+                    .build();
+            HttpResponse<Void> resp = client.send(req, HttpResponse.BodyHandlers.discarding());
+            return resp.statusCode() == 200;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
      * 合成英文文本，返回 WAV 字节。服务不可用/失败返回 null，由前端回退浏览器端推理或其它引擎。
      */
     public byte[] synthesize(String text, Double speed, String voice) {

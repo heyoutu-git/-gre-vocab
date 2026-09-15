@@ -59,15 +59,19 @@ html { font-size: calc(16px * var(--gre-fs-scale)); }
   .el-input__inner, .el-textarea__inner { font-size: 13px; }
 }
 
-/* 词汇卡片 */
+/* ===== 词汇卡片 ===== */
 .vocab-card {
   background: var(--gre-surface);
   border: 1px solid var(--gre-border);
-  border-radius: 12px;
-  padding: 14px 16px;
-  margin-bottom: 12px;
-  box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 3px rgba(31, 45, 61, .04);
   transition: border-color .2s ease, background .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+.vocab-card:hover {
+  border-color: rgba(79, 109, 245, .45);
+  box-shadow: 0 4px 16px rgba(79, 109, 245, .10);
 }
 /* 跟读时当前词条高亮跟踪 */
 .vocab-card.active {
@@ -77,14 +81,54 @@ html { font-size: calc(16px * var(--gre-fs-scale)); }
   transform: translateY(-1px);
 }
 .vocab-card.active .vocab-word { color: var(--gre-primary); }
-.vocab-word { font-size: 1.5rem; font-weight: 700; color: var(--gre-text); letter-spacing: .3px; }
-.vocab-phon { color: var(--gre-text-soft); margin-left: 10px; font-style: italic; }
+.vocab-word { font-size: 1.45rem; font-weight: 700; color: var(--gre-text); letter-spacing: .3px; }
+.vocab-phon {
+  color: var(--gre-text-soft);
+  margin-left: 10px;
+  font-style: italic;
+  background: var(--gre-bg);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: .88rem;
+}
 .vocab-pos { display: inline-block; background: var(--gre-primary-soft); color: var(--gre-primary);
   border-radius: 6px; padding: 1px 8px; font-size: .8rem; margin-left: 8px; font-weight: 600; }
 .vocab-inflect { color: var(--gre-text-soft); font-size: .82rem; margin-left: 8px; }
-.vocab-def { margin-top: 6px; color: var(--gre-text); line-height: 1.6; }
-.vocab-ex { margin-top: 6px; color: var(--gre-text-soft); line-height: 1.6; border-left: 3px solid var(--gre-border); padding-left: 10px; font-style: italic; }
-.vocab-actions { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+.vocab-def { margin-top: 8px; color: var(--gre-text); line-height: 1.65; }
+/* 中文释义：主色底纹带，与封面蓝呼应 */
+.vocab-def-cn {
+  margin-top: 8px;
+  padding: 7px 12px;
+  background: var(--gre-primary-soft);
+  border-left: 3px solid var(--gre-primary);
+  border-radius: 0 8px 8px 0;
+  color: var(--gre-text);
+  font-size: 14px;
+  line-height: 1.55;
+  font-weight: 500;
+  /* ECDICT 用 \n 分隔多义项；这里当文本里的真换行渲染 */
+  white-space: pre-wrap;
+}
+/* 例句：主色引用条 */
+.vocab-ex {
+  margin-top: 8px;
+  color: var(--gre-text-soft);
+  line-height: 1.6;
+  border-left: 3px solid rgba(79, 109, 245, .35);
+  padding-left: 10px;
+  font-style: italic;
+}
+/* 操作区：虚线与内容区分隔 */
+.vocab-actions {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--gre-border);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.vocab-card.done { opacity: .55; }
+.vocab-card.done .vocab-def-cn { opacity: .8; }
 
 /* 课时卡片 */
 .lesson-card { cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }

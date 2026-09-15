@@ -39,6 +39,9 @@ public interface UserMapper {
     @Update("UPDATE t_user SET status = #{status}, updated_at = NOW() WHERE id = #{id}")
     int updateStatus(@Param("id") Long id, @Param("status") Integer status);
 
+    @Update("UPDATE t_user SET password_hash = #{passwordHash}, updated_at = NOW() WHERE id = #{id}")
+    int updatePassword(@Param("id") Long id, @Param("passwordHash") String passwordHash);
+
     @Insert("INSERT INTO t_user_role(user_id, role_id) " +
             "VALUES(#{userId}, (SELECT id FROM t_role WHERE code = #{roleCode}))")
     int assignRole(@Param("userId") Long userId, @Param("roleCode") String roleCode);

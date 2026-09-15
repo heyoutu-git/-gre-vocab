@@ -11,7 +11,6 @@ export default {
     needCaptcha: 'Please enter the captcha', captchaRefresh: 'Tap to refresh', okLogin: 'Signed in',
     privacyText: 'We use your account information to provide the learning service and never share your personal data with third parties. By registering you agree to this processing.',
     okRegister: 'Registered. You can sign in after admin approval.', reviewTip: 'New accounts require admin approval before signing in',
-    devTip: 'Default admin: admin / admin123 (dev only)'
   },
   lesson: {
 noMatch: 'No matching words', unfavorited: 'Removed from favorites', favorited: 'Favorited: ',
@@ -43,6 +42,7 @@ tagReading: 'Reading', tagMine: 'Mine', tagShowcase: 'Featured', tagPublic: 'Pub
     settingsTitle: 'Book settings & study plan',
     readingNoPlan: 'Reading books do not support word study plans',
     readingNoPlanDesc: 'This book contains reading passages only. Open a lesson to set reading progress.',
+    planUserScope: 'Your study plan is private to you and does not affect other users.',
     resplitBtn: 'Resplit lessons', planSection: 'Study plan', dailyGoal: 'Daily word goal',
     startDate: 'Start date', endDate: 'End date', expectedFinish: 'Expected finish', noGoal: 'No goal set',
     resplitOk: 'Resplit at {n} words/lesson: {l} lessons',
@@ -76,6 +76,7 @@ account: 'Account: ', role: 'Role: ', ttsHelp: 'About text-to-speech',
     search: 'Search username / nickname / phone', id: 'ID', username: 'Username', nickname: 'Nickname', phone: 'Phone',
     regAddr: 'Register IP:Port', regTime: 'Registered at', status: 'Status', action: 'Actions',
     approve: 'Approve', reject: 'Reject', disable: 'Disable', enable: 'Enable', confirm: 'Confirm', confirmMsg: 'Apply "{action}" to user "{name}"?', ok: 'Done',
+    resetPwd: 'Reset Password', resetPwdConfirm: 'Reset the password of user "{name}" to the default 123456? Please remind them to change it after logging in.', resetPwdOk: 'Password of "{name}" has been reset to 123456',
     noReg: '—', empty: 'No users'
   },
   common: { searchBtn: 'Search', cancel: 'Cancel', save: 'Save', saved: 'Saved', close: 'Close', delete: 'Delete', deleted: 'Deleted', edit: 'Edit', mobile: '📱 Mobile', desktop: '💻 Desktop' },
@@ -117,6 +118,14 @@ account: 'Account: ', role: 'Role: ', ttsHelp: 'About text-to-speech',
     tip: 'Notice',
     delLessonConfirm: 'Delete "{name}"? The words in this lesson will also be deleted.',
     movedOwner: 'Book owner updated', moved: 'Moved', delVocabConfirm: 'Delete this word?',
-    jsonPh: 'Parsed word JSON appears here, format: [{"word":"abase", ...}]'
+    jsonPh: 'Parsed word JSON appears here, format: [{"word":"abase", ...}]',
+    tabKokoro: 'Voice Service',
+    kokoroHealth: 'Service Status', kokoroHealthy: 'Running', kokoroDown: 'Unavailable',
+    kokoroCheckAt: 'Last Check', kokoroFailCount: 'Consecutive Failures',
+    kokoroAutoRestart: 'Auto Restarts', kokoroLastRestart: 'Last Auto Restart',
+    kokoroLastAction: 'Last Manual Action', kokoroWatchdogTip: 'The watchdog probes the local inference service every 60s and auto-starts it after 2 consecutive failures (3-min cooldown). You can also start/stop/restart manually here.',
+    kokoroProbe: 'Check Now', kokoroStart: 'Start', kokoroStop: 'Stop', kokoroRestart: 'Restart',
+    kokoroOpConfirm: 'Confirm to "{op}" the voice engine? While stopped, online reading falls back to browser synthesis.',
+    kokoroOpOk: '"{op}" executed', kokoroOpFail: 'Operation failed, please retry later'
   }
 }

@@ -290,8 +290,9 @@ function speakReadingFrom(n) {
 }
 
 // 进入页面/换课时：有历史位置且未完成 → 提示继续
-async function promptResume(lid) {
-  const n = await checkLessonResume(() => lid, userStore)
+// prompt=false：页内跳课（上一课/下一课）只静默记录访问，不弹窗
+async function promptResume(lid, prompt = true) {
+  const n = await checkLessonResume(() => lid, userStore, prompt)
   if (!n) return
   ElMessageBox.confirm(t('lesson.resumeBody', { n }), t('lesson.resumeTitle'), {
     confirmButtonText: t('lesson.resumeYes'),
@@ -382,7 +383,7 @@ onMounted(async () => {
 watch(() => props.lessonId, async (newId) => {
   await loadPassage(newId)
   refreshDone()
-  promptResume(newId)
+  promptResume(newId, false) // 页内跳课不弹「继续上次学习」
   loadBookLessons()
   consumePendingAutoPlay(newId)
 })

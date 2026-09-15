@@ -29,6 +29,7 @@ export const adminApi = {
   // 用户管理（注册审核/启停）
   listUsers: (keyword, status) => http.get('/admin/users', { params: { keyword: keyword || undefined, status } }),
   setUserStatus: (id, status) => http.put(`/admin/users/${id}/status`, null, { params: { status } }),
+  resetUserPassword: (id) => http.put(`/admin/users/${id}/reset-password`),
 
   // 课时
   listLessons: (bookId) => http.get('/admin/lessons', { params: bookId ? { bookId } : {} }),
@@ -67,7 +68,13 @@ export const adminApi = {
   saveTtsProvider: (data) => http.post('/admin/tts/providers', data),
   removeTtsProvider: (id) => http.delete(`/admin/tts/providers/${id}`),
   getTtsUsage: (provider) => http.get(`/admin/tts/usage/${provider}`),
-  setTtsQuota: (provider, quota) => http.post(`/admin/tts/usage/${provider}/quota`, null, { params: { quota } })
+  setTtsQuota: (provider, quota) => http.post(`/admin/tts/usage/${provider}/quota`, null, { params: { quota } }),
+
+  // 本机 Kokoro 推理服务（状态 / 启动 / 停止 / 重启）
+  kokoroStatus: (probe = true) => http.get('/admin/tts/kokoro/status', { params: { probe } }),
+  kokoroStart: () => http.post('/admin/tts/kokoro/start'),
+  kokoroStop: () => http.post('/admin/tts/kokoro/stop'),
+  kokoroRestart: () => http.post('/admin/tts/kokoro/restart')
 }
 
 // TTS（学习端）

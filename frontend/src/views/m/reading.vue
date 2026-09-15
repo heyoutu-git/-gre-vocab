@@ -298,8 +298,9 @@ function speakReading() {
 }
 
 // 从第 n 句续播（「继续上次学习」）
-async function promptResume(lid) {
-  const n = await checkLessonResume(() => lid, userStore)
+// prompt=false：页内跳课（上一课/下一课）只静默记录访问，不弹窗
+async function promptResume(lid, prompt = true) {
+  const n = await checkLessonResume(() => lid, userStore, prompt)
   if (!n) return
   showConfirmDialog({
     title: t('lesson.resumeTitle'),
@@ -426,7 +427,7 @@ function consumePendingAutoPlay(lid) {
 
 watch(() => props.lessonId, async (newId) => {
   await loadPassage(newId)
-  promptResume(newId)
+  promptResume(newId, false) // 页内跳课不弹「继续上次学习」
   consumePendingAutoPlay(newId)
 })
 </script>

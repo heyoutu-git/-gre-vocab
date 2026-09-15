@@ -11,7 +11,6 @@ export default {
     needCaptcha: 'Bitte Captcha eingeben', captchaRefresh: 'Zum Aktualisieren tippen', okLogin: 'Angemeldet',
     privacyText: 'Wir nutzen Kontodaten ausschließlich für den Lernservice und geben keine persönlichen Daten an Dritte weiter. Mit der Registrierung stimmen Sie dieser Verarbeitung zu.',
     okRegister: 'Registrierung erfolgreich. Anmeldung nach Freigabe durch den Administrator möglich.', reviewTip: 'Neue Konten benötigen die Freigabe durch den Administrator',
-    devTip: 'Standard-Admin: admin / admin123 (nur Entwicklung)'
   },
   lesson: {
 noMatch: 'Keine passenden Wörter', unfavorited: 'Aus Favoriten entfernt', favorited: 'Favorisiert: ',
@@ -43,6 +42,7 @@ tagReading: 'Lesen', tagMine: 'Meine', tagShowcase: 'Vitrine', tagPublic: 'Öffe
     settingsTitle: 'Bucheinstellungen & Lernplan',
     readingNoPlan: 'Lesebücher unterstützen keinen Vokabellernplan',
     readingNoPlanDesc: 'Dieses Buch enthält nur Lesetexte. Öffnen Sie eine Lektion, um den Lesefortschritt zu verfolgen.',
+    planUserScope: 'Ihr Lernplan gilt nur für Sie und beeinflusst andere Nutzer nicht.',
     resplitBtn: 'Lektionen neu aufteilen', planSection: 'Lernplan', dailyGoal: 'Tagesziel (Wörter)',
     startDate: 'Startdatum', endDate: 'Enddatum', expectedFinish: 'Voraussichtlich fertig', noGoal: 'Kein Ziel',
     resplitOk: 'Neu aufgeteilt zu {n} Wörtern/Lektion: {l} Lektionen',
@@ -76,6 +76,7 @@ account: 'Konto: ', role: 'Rolle: ', ttsHelp: 'Über die Sprachausgabe',
     search: 'Benutzername / Spitzname / Telefon suchen', id: 'ID', username: 'Benutzername', nickname: 'Spitzname', phone: 'Telefon',
     regAddr: 'Registrierungs-IP:Port', regTime: 'Registriert am', status: 'Status', action: 'Aktionen',
     approve: 'Freigeben', reject: 'Ablehnen', disable: 'Sperren', enable: 'Entsperren', confirm: 'Bestätigen', confirmMsg: '„{action}“ für Benutzer „{name}“ ausführen?', ok: 'Erledigt',
+    resetPwd: 'Passwort zurücksetzen', resetPwdConfirm: 'Passwort des Benutzers „{name}" auf den Standardwert 123456 zurücksetzen? Bitte weisen Sie ihn nach dem Login auf eine Änderung hin.', resetPwdOk: 'Passwort von „{name}" wurde auf 123456 zurückgesetzt',
     noReg: '—', empty: 'Keine Benutzer'
   },
   common: { searchBtn: 'Suchen', cancel: 'Abbrechen', save: 'Speichern', saved: 'Gespeichert', close: 'Schließen', delete: 'Löschen', deleted: 'Gelöscht', edit: 'Bearbeiten', mobile: '📱 Mobil', desktop: '💻 Desktop' },
@@ -117,6 +118,14 @@ account: 'Konto: ', role: 'Rolle: ', ttsHelp: 'Über die Sprachausgabe',
     tip: 'Hinweis',
     delLessonConfirm: '„{name}" löschen? Die Wörter dieser Lektion werden ebenfalls gelöscht.',
     movedOwner: 'Buchbesitzer aktualisiert', moved: 'Verschoben', delVocabConfirm: 'Dieses Wort löschen?',
-    jsonPh: 'Das analysierte JSON erscheint hier, Format: [{"word":"abase", ...}]'
+    jsonPh: 'Das analysierte JSON erscheint hier, Format: [{"word":"abase", ...}]',
+    tabKokoro: 'Sprachdienst',
+    kokoroHealth: 'Dienststatus', kokoroHealthy: 'Läuft', kokoroDown: 'Nicht verfügbar',
+    kokoroCheckAt: 'Letzte Prüfung', kokoroFailCount: 'Fehler in Folge',
+    kokoroAutoRestart: 'Auto-Neustarts', kokoroLastRestart: 'Letzter Auto-Neustart',
+    kokoroLastAction: 'Letzte manuelle Aktion', kokoroWatchdogTip: 'Der watchdog prüft den lokalen Dienst alle 60 s und startet ihn nach 2 aufeinanderfolgenden Fehlern automatisch neu (3 Min. Abklingzeit). Manuelles Starten/Stoppen/Neustarten hier möglich.',
+    kokoroProbe: 'Jetzt prüfen', kokoroStart: 'Starten', kokoroStop: 'Stoppen', kokoroRestart: 'Neustarten',
+    kokoroOpConfirm: '"{op}" der Sprachmaschine bestätigen? Bei Stopp fällt das Online-Vorlesen auf Browser-Synthese zurück.',
+    kokoroOpOk: '"{op}" ausgeführt', kokoroOpFail: 'Fehlgeschlagen, später erneut versuchen'
   }
 }

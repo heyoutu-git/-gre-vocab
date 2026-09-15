@@ -10,7 +10,6 @@ export default {
     needCaptcha: '请输入验证码', captchaRefresh: '点击刷新', okLogin: '登录成功',
     privacyText: '我们使用账号信息提供学习服务，不会向第三方泄露您的个人数据。注册即表示同意我们按此方式处理您的信息。',
     okRegister: '注册成功，等待管理员审核通过后即可登录', reviewTip: '注册后需管理员审核通过才能登录',
-    devTip: '默认管理员账号：admin / admin123（仅开发期）'
   },
   lesson: {
 noMatch: '无匹配词汇', unfavorited: '已取消收藏', favorited: '已收藏：',
@@ -42,6 +41,7 @@ tagReading: '阅读', tagMine: '我的', tagShowcase: '展示', tagPublic: '公�
     settingsTitle: '书本设置与学习计划',
     readingNoPlan: '阅读书暂不支持单词学习计划',
     readingNoPlanDesc: '当前书本为阅读片段，不统计词汇数。如需设定阅读进度，可直接进入课时学习。',
+    planUserScope: '学习计划仅对您本人生效，不影响其他用户。',
     resplitBtn: '按此重切分课时', planSection: '学习计划', dailyGoal: '每日目标词数',
     startDate: '计划开始', endDate: '计划结束', expectedFinish: '预计完成', noGoal: '未设目标',
     resplitOk: '已按每课 {n} 词重切分：{l} 课时',
@@ -75,6 +75,7 @@ account: '账号：', role: '角色：', ttsHelp: '语音朗读说明',
     search: '搜索用户名/昵称/手机号', id: 'ID', username: '用户名', nickname: '昵称', phone: '手机号',
     regAddr: '注册 IP:端口', regTime: '注册时间', status: '状态', action: '操作',
     approve: '通过审核', reject: '拒绝', disable: '禁用', enable: '启用', confirm: '确认', confirmMsg: '确认对用户「{name}」执行「{action}」？', ok: '操作成功',
+    resetPwd: '重置密码', resetPwdConfirm: '确认将用户「{name}」的密码重置为默认密码 123456？重置后请提醒其登录并自行修改。', resetPwdOk: '已将「{name}」的密码重置为 123456',
     noReg: '—', empty: '暂无用户'
   },
   common: { searchBtn: '搜索', cancel: '取消', save: '保存', saved: '已保存', close: '关闭', delete: '删除', deleted: '已删除', edit: '编辑', mobile: '📱 手机版', desktop: '💻 电脑版' },
@@ -116,6 +117,14 @@ account: '账号：', role: '角色：', ttsHelp: '语音朗读说明',
     tip: '提示',
     delLessonConfirm: '确认删除「{name}」？该课时的词汇也会一并删除。',
     movedOwner: '已调整书本归属', moved: '已移动', delVocabConfirm: '确认删除该词汇？',
-    jsonPh: '解析后的词汇 JSON 会出现在这里，格式：[{"word":"abase", ...}]'
+    jsonPh: '解析后的词汇 JSON 会出现在这里，格式：[{"word":"abase", ...}]',
+    tabKokoro: '语音服务',
+    kokoroHealth: '服务状态', kokoroHealthy: '运行中', kokoroDown: '不可用',
+    kokoroCheckAt: '最近检测', kokoroFailCount: '连续失败次数',
+    kokoroAutoRestart: '自动重启次数', kokoroLastRestart: '上次自动重启',
+    kokoroLastAction: '最近手动操作', kokoroWatchdogTip: '看门狗每 60 秒自动探测本机推理服务，连续 2 次失败会自动拉起（重启后 3 分钟冷却）。也可在此手动启动/停止/重启。',
+    kokoroProbe: '立即检测', kokoroStart: '启动', kokoroStop: '停止', kokoroRestart: '重启',
+    kokoroOpConfirm: '确认对语音引擎执行「{op}」？停止期间在线跟读将回退浏览器端合成。',
+    kokoroOpOk: '「{op}」已执行', kokoroOpFail: '操作失败，请稍后重试'
   }
 }

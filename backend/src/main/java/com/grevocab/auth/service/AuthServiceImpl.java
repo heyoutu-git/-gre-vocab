@@ -85,7 +85,10 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public AuthResponse login(LoginRequest req) {
-        if (req.getUsername() == null || req.getPassword() == null) {
+        // 用户名统一 trim（历史数据曾出现末尾带空格导致登录失败）
+        if (req.getUsername() != null) req.setUsername(req.getUsername().trim());
+        if (req.getPassword() != null) req.setPassword(req.getPassword().trim());
+        if (req.getUsername() == null || req.getUsername().isEmpty() || req.getPassword() == null || req.getPassword().isEmpty()) {
             log("login", null, req.getUsername(), 0, "用户名或密码为空");
             throw new BizException(400, "用户名和密码不能为空");
         }
@@ -125,7 +128,10 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void register(RegisterRequest req) {
-        if (req.getUsername() == null || req.getPassword() == null) {
+        // 用户名/昵称统一 trim（防止注册时带入首尾空格导致后续登录失败）
+        if (req.getUsername() != null) req.setUsername(req.getUsername().trim());
+        if (req.getNickname() != null) req.setNickname(req.getNickname().trim());
+        if (req.getUsername() == null || req.getUsername().isEmpty() || req.getPassword() == null) {
             log("register", null, req.getUsername(), 0, "用户名或密码为空");
             throw new BizException(400, "用户名和密码不能为空");
         }
@@ -145,7 +151,7 @@ public class AuthServiceImpl implements AuthService {
         User user = new User();
         user.setUsername(req.getUsername());
         user.setPasswordHash(passwordEncoder.encode(req.getPassword()));
-        user.setNickname(req.getNickname() != null ? req.getNickname() : req.getUsername());
+        user.setNickname(req.getNickname() != null && !req.getNickname().isEmpty() ? req.getNickname() : req.getUsername());
         user.setEmail(req.getEmail());
         user.setPhone(req.getPhone());
         user.setStatus(2); // 待管理员审核

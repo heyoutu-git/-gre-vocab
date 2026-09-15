@@ -34,10 +34,12 @@ export function useProgressReport(getLessonId, ttsState) {
 }
 
 // 进入课时页：记一次访问（last_visit_at/visit_count），并返回上次学到的位置（未完成且有记录时）
-export async function checkLessonResume(getLessonId, userStore) {
+// prompt=false 时仅静默记录访问、不返回位置（页内跳课不弹「继续上次学习」）
+export async function checkLessonResume(getLessonId, userStore, prompt = true) {
   const lid = getLessonId()
   if (!lid || !userStore.isLogin) return 0
   learningApi.visit(lid, -1).catch(() => {})
+  if (!prompt) return 0
   try {
     const { data } = await learningApi.progressDetail(lid)
     if (data && data.finished !== 1 && (data.lastWordIndex || 0) > 0) return data.lastWordIndex

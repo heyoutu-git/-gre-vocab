@@ -47,7 +47,7 @@ public interface BookMapper {
             "is_public=#{isPublic}, browse_public=#{browsePublic}, user_id=#{userId}, updated_at=NOW() WHERE id=#{id}")
     int update(Book b);
 
-    // 学习计划 / 每课词数更新（用户级）
+    // 学习计划 / 每课词数更新（书级，兼容保留：仅书主私有书路径使用）
     @Update("UPDATE t_book SET words_per_lesson=#{wordsPerLesson}, plan_daily_words=#{planDailyWords}, " +
             "plan_start_date=#{planStartDate}, plan_end_date=#{planEndDate}, updated_at=NOW() WHERE id=#{id}")
     int updatePlan(@Param("id") Long id,
@@ -55,6 +55,10 @@ public interface BookMapper {
                    @Param("planDailyWords") Integer planDailyWords,
                    @Param("planStartDate") Date planStartDate,
                    @Param("planEndDate") Date planEndDate);
+
+    // 仅更新每课词数（重切分用，不动计划字段）
+    @Update("UPDATE t_book SET words_per_lesson=#{wordsPerLesson}, updated_at=NOW() WHERE id=#{id}")
+    int updateWordsPerLesson(@Param("id") Long id, @Param("wordsPerLesson") Integer wordsPerLesson);
 
     @Delete("DELETE FROM t_book WHERE id=#{id}")
     int delete(Long id);

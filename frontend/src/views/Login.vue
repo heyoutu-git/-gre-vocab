@@ -41,7 +41,6 @@
           </el-form>
         </el-tab-pane>
       </el-tabs>
-      <p class="tip">{{ $t('login.devTip') }}</p>
     </el-card>
   </div>
 </template>
@@ -132,7 +131,6 @@ async function doRegister() {
 .box h2 { text-align: center; margin: 6px 0 18px; }
 .btn { width: 100%; margin-top: 18px; }
 .review-tip { text-align: center; color: #e6a23c; font-size: 12px; margin: 10px 0 0; }
-.tip { text-align: center; color: #999; font-size: 12px; margin: 10px 0 0; }
 .captcha-row { display: flex; gap: 10px; margin-top: 12px; align-items: center; }
 .captcha-img {
   height: 40px; width: 110px; border: 1px solid #dcdfe6; border-radius: 4px;

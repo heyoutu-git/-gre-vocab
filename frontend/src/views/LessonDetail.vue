@@ -267,8 +267,9 @@ function speakWordsFrom(n) {
 }
 
 // 进入页面/换课时：有历史位置且未完成 → 提示继续
-async function promptResume(lid) {
-  const n = await checkLessonResume(() => lid, userStore)
+// prompt=false：页内跳课（上一课/下一课）只静默记录访问，不弹窗
+async function promptResume(lid, prompt = true) {
+  const n = await checkLessonResume(() => lid, userStore, prompt)
   if (!n || bookType.value === 2) return // 阅读课由内嵌 ReadingView 处理
   ElMessageBox.confirm(t('lesson.resumeBody', { n }), t('lesson.resumeTitle'), {
     confirmButtonText: t('lesson.resumeYes'),
@@ -349,7 +350,7 @@ async function handleBookLoop() {
 }
 
 // 重新加载某一课时数据（本课 + 词表 + 本书课时列表）
-async function loadLesson(lid) {
+async function loadLesson(lid, prompt = true) {
   loading.value = true
   try {
     const [l, vs] = await Promise.all([lessonApi.get(lid), lessonApi.vocabularies(lid)])
@@ -367,7 +368,7 @@ async function loadLesson(lid) {
     }
   } catch (e) { /* 公开接口 */ } finally { loading.value = false }
   refreshDone(lid)
-  promptResume(lid)
+  promptResume(lid, prompt)
 }
 
 // 学习进度（服务端存储，电脑/手机跨端同步）
@@ -447,7 +448,8 @@ watch(
   async (newId) => {
     // 组件复用（/lessons/:id 只变参数）不触发卸载，必须显式终止旧课会话
     stopTTS()
-    await loadLesson(newId)
+    // prompt=false：页内跳课不弹「继续上次学习」
+    await loadLesson(newId, false)
     consumePendingAutoPlay(newId)
   }
 )
@@ -481,19 +483,7 @@ onBookLoop(handleBookLoop)
 .lesson-nav .el-button { min-width: 132px; }
 .lesson-nav-top { display: inline-flex; gap: 6px; margin-left: 10px; vertical-align: middle; }
 .done { opacity: .55; }
-.vocab-def-cn {
-  font-size: 14px;
-  color: var(--gre-primary, #5b6ea0);
-  margin: 4px 0 2px;
-  line-height: 1.5;
-  /* 中文读感：浅一档色调，与上方英文释义行对照 */
-  font-weight: 500;
-  /* ECDICT 用 \n 分隔多义项；这里当文本里的真换行渲染 */
-  white-space: pre-wrap;
-}
-@media (prefers-color-scheme: dark) {
-  .vocab-def-cn { color: #93a3c4; }
-}
+/* 词汇卡片主体样式在 styles/global.css（vocab-card 系列全局复用） */
 /* 小屏：.el-main 内边距为 12px，对应更小的负 margin 抵消 */
 @media (max-width: 768px) {
   .topbar { margin: -12px -12px 10px; padding: 0 12px 0; top: -12px; }

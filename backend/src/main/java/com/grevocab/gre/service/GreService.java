@@ -7,10 +7,12 @@ import com.grevocab.gre.dto.ReadingSegment;
 import com.grevocab.gre.entity.Book;
 import com.grevocab.gre.entity.Lesson;
 import com.grevocab.gre.entity.Passage;
+import com.grevocab.gre.entity.UserBookPlan;
 import com.grevocab.gre.entity.Vocabulary;
 import com.grevocab.gre.mapper.BookMapper;
 import com.grevocab.gre.mapper.LessonMapper;
 import com.grevocab.gre.mapper.PassageMapper;
+import com.grevocab.gre.mapper.UserBookPlanMapper;
 import com.grevocab.gre.mapper.VocabularyMapper;
 import lombok.Data;
 import org.springframework.stereotype.Service;
@@ -30,15 +32,18 @@ public class GreService {
     private final VocabularyMapper vocabMapper;
     private final BookMapper bookMapper;
     private final PassageMapper passageMapper;
+    private final UserBookPlanMapper userBookPlanMapper;
     private final PdfParseService pdfParseService;
     private final RoleMapper roleMapper;
 
     public GreService(LessonMapper lessonMapper, VocabularyMapper vocabMapper, BookMapper bookMapper,
-                      PassageMapper passageMapper, PdfParseService pdfParseService, RoleMapper roleMapper) {
+                      PassageMapper passageMapper, UserBookPlanMapper userBookPlanMapper,
+                      PdfParseService pdfParseService, RoleMapper roleMapper) {
         this.lessonMapper = lessonMapper;
         this.vocabMapper = vocabMapper;
         this.bookMapper = bookMapper;
         this.passageMapper = passageMapper;
+        this.userBookPlanMapper = userBookPlanMapper;
         this.pdfParseService = pdfParseService;
         this.roleMapper = roleMapper;
     }
@@ -343,11 +348,24 @@ public class GreService {
         return importVocabularies(wordsPerLesson != null ? wordsPerLesson : 50, target.getId(), items);
     }
 
-    // ===== 书本设置：每课词数 + 学习计划 =====
+    // ===== 书本设置：每课词数（书主） + 学习计划（用户级，登录即可设自己的计划） =====
     public void updateBookPlan(Long bookId, Long uid, Integer wordsPerLesson,
                                Integer planDailyWords, Date planStartDate, Date planEndDate) {
-        requireOwned(bookId, uid);
-        bookMapper.updatePlan(bookId, wordsPerLesson, planDailyWords, planStartDate, planEndDate);
+        Book b = bookMapper.findById(bookId);
+        if (b == null || !isCatalogVisible(b, uid)) throw new BizException(404, "书本不存在");
+        boolean owner = b.getUserId() != null && b.getUserId().equals(uid);
+        // 每课词数影响课时切分，是书级设置，仅书主可改
+        if (wordsPerLesson != null && owner) {
+            bookMapper.updateWordsPerLesson(bookId, wordsPerLesson);
+        }
+        // 学习计划：用户级，每人每书一行互不影响
+        UserBookPlan p = new UserBookPlan();
+        p.setBookId(bookId);
+        p.setUserId(uid);
+        p.setPlanDailyWords(planDailyWords);
+        p.setPlanStartDate(planStartDate);
+        p.setPlanEndDate(planEndDate);
+        userBookPlanMapper.upsert(p);
     }
 
     // ===== 重切分课时（按新每课词数重建，保留词汇） =====
@@ -359,7 +377,7 @@ public class GreService {
         }
         List<Vocabulary> items = vocabMapper.findByBook(bookId);
         if (items.isEmpty()) throw new BizException(400, "该书本暂无词汇，无法重切分");
-        bookMapper.updatePlan(bookId, wordsPerLesson, b.getPlanDailyWords(), b.getPlanStartDate(), b.getPlanEndDate());
+        bookMapper.updateWordsPerLesson(bookId, wordsPerLesson);
         return importVocabularies(wordsPerLesson, bookId, items);
     }
 
@@ -378,17 +396,24 @@ public class GreService {
         plan.setLearnedWords(learned);
         plan.setRemainWords(remain);
         plan.setPercent(percent);
-        plan.setDailyGoal(b.getPlanDailyWords());
-        plan.setStartDate(b.getPlanStartDate());
-        plan.setEndDate(b.getPlanEndDate());
+
+        // 计划取「当前用户自己的」；无则回退书级字段（书主/存量兼容）
+        UserBookPlan up = uid == null ? null : userBookPlanMapper.findByBookAndUser(bookId, uid);
+        Integer daily = up != null && up.getPlanDailyWords() != null
+                ? up.getPlanDailyWords() : b.getPlanDailyWords();
+        Date start = up != null && up.getPlanStartDate() != null
+                ? up.getPlanStartDate() : b.getPlanStartDate();
+        plan.setDailyGoal(daily);
+        plan.setStartDate(start);
+        plan.setEndDate(up != null && up.getPlanEndDate() != null
+                ? up.getPlanEndDate() : b.getPlanEndDate());
 
         // 预计完成日 = 开始日 + ceil(剩余 / 每日目标) 天
-        if (b.getPlanStartDate() != null && b.getPlanDailyWords() != null
-                && b.getPlanDailyWords() > 0 && remain > 0) {
-            LocalDate start = b.getPlanStartDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-            long days = (long) Math.ceil((double) remain / b.getPlanDailyWords());
+        if (start != null && daily != null && daily > 0 && remain > 0) {
+            LocalDate startDate = start.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+            long days = (long) Math.ceil((double) remain / daily);
             plan.setExpectedFinishDate(Date.from(
-                    start.plusDays(days).atStartOfDay(ZoneId.systemDefault()).toInstant()));
+                    startDate.plusDays(days).atStartOfDay(ZoneId.systemDefault()).toInstant()));
         }
         return plan;
     }
@@ -396,6 +421,7 @@ public class GreService {
     public void removeUserBook(Long bookId, Long uid) {
         requireOwned(bookId, uid);
         bookMapper.delete(bookId);
+        userBookPlanMapper.deleteByBook(bookId);
     }
 
     // ===== 可见性辅助 =====

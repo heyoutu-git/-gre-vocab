@@ -24,11 +24,14 @@ public class AdminController {
     private final GreService service;
     private final PdfParseService pdfParseService;
     private final UserMapper userMapper;
+    private final com.grevocab.auth.util.PasswordEncoderUtil passwordEncoder;
 
-    public AdminController(GreService service, PdfParseService pdfParseService, UserMapper userMapper) {
+    public AdminController(GreService service, PdfParseService pdfParseService, UserMapper userMapper,
+                           com.grevocab.auth.util.PasswordEncoderUtil passwordEncoder) {
         this.service = service;
         this.pdfParseService = pdfParseService;
         this.userMapper = userMapper;
+        this.passwordEncoder = passwordEncoder;
     }
 
     // ---- 书本管理 ----
@@ -85,6 +88,18 @@ public class AdminController {
         // 0=禁用 1=正常 2=待审核（仅注册产生，不允许手工设置） 3=已拒绝
         if (status == null || status < 0 || status > 3 || status == 2) throw new IllegalArgumentException("非法状态");
         userMapper.updateStatus(id, status);
+        return Result.success();
+    }
+
+    // 重置用户密码为默认密码（123456），请提醒用户登录后自行修改
+    private static final String RESET_DEFAULT_PASSWORD = "123456";
+
+    @PutMapping("/users/{id}/reset-password")
+    public Result<Void> resetUserPassword(@PathVariable Long id) {
+        com.grevocab.auth.entity.User u = userMapper.findById(id);
+        if (u == null) throw new IllegalArgumentException("用户不存在");
+        String hash = passwordEncoder.encode(RESET_DEFAULT_PASSWORD);
+        userMapper.updatePassword(id, hash);
         return Result.success();
     }
 

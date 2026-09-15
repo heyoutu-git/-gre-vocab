@@ -155,6 +155,30 @@
         <el-empty v-else :description="$t('admin.noUsage')" />
       </el-tab-pane>
 
+      <!-- ===== 语音服务（Kokoro 本机推理看门狗） ===== -->
+      <el-tab-pane :label="$t('admin.tabKokoro')" name="kokoro">
+        <el-descriptions :column="2" border style="max-width:760px;margin-bottom:16px">
+          <el-descriptions-item :label="$t('admin.kokoroHealth')">
+            <el-tag :type="kokoro.healthy ? 'success' : 'danger'">{{ kokoro.healthy ? $t('admin.kokoroHealthy') : $t('admin.kokoroDown') }}</el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item :label="$t('admin.kokoroCheckAt')">{{ kokoro.checkAt || '—' }}</el-descriptions-item>
+          <el-descriptions-item :label="$t('admin.kokoroFailCount')">{{ kokoro.consecutiveFailures || 0 }}</el-descriptions-item>
+          <el-descriptions-item :label="$t('admin.kokoroAutoRestart')">{{ kokoro.autoRestartCount || 0 }}</el-descriptions-item>
+          <el-descriptions-item :label="$t('admin.kokoroLastRestart')">{{ kokoro.lastAutoRestartAt || '—' }}</el-descriptions-item>
+          <el-descriptions-item :label="$t('admin.kokoroLastAction')">
+            {{ kokoro.lastAction || '—' }}
+            <div v-if="kokoro.lastActionMessage" style="color:var(--gre-text-soft);font-size:12px;word-break:break-all">{{ kokoro.lastActionMessage }}</div>
+          </el-descriptions-item>
+        </el-descriptions>
+        <el-alert type="info" :closable="false" show-icon style="max-width:760px;margin-bottom:14px" :title="$t('admin.kokoroWatchdogTip')" />
+        <el-space wrap>
+          <el-button type="primary" :loading="kokoroLoading" @click="loadKokoro(true)">{{ $t('admin.kokoroProbe') }}</el-button>
+          <el-button :disabled="kokoroLoading" @click="kokoroOp('start')">{{ $t('admin.kokoroStart') }}</el-button>
+          <el-button type="warning" :disabled="kokoroLoading" @click="kokoroOp('stop')">{{ $t('admin.kokoroStop') }}</el-button>
+          <el-button type="danger" :disabled="kokoroLoading" @click="kokoroOp('restart')">{{ $t('admin.kokoroRestart') }}</el-button>
+        </el-space>
+      </el-tab-pane>
+
       <!-- ===== 阅读篇章对齐调整 ===== -->
       <el-tab-pane :label="$t('admin.tabAlign')" name="align">
         <el-form :inline="true" style="margin-bottom:10px">
@@ -327,7 +351,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Document } from '@element-plus/icons-vue'
@@ -375,6 +399,36 @@ const ttsForm = ref({ id: null, engineCode: 'tencent', provider: 'tencent', appI
 const ttsUsage = ref(null)
 const usageProvider = ref('tencent')
 const quotaInput = ref(0)
+
+// ---- 语音服务（Kokoro 本机推理） ----
+const kokoro = ref({})
+const kokoroLoading = ref(false)
+
+async function loadKokoro(probe) {
+  kokoroLoading.value = true
+  try {
+    const { data } = await adminApi.kokoroStatus(probe)
+    kokoro.value = data || {}
+  } catch (e) { /* 接口失败保持原状态 */ }
+  finally { kokoroLoading.value = false }
+}
+
+async function kokoroOp(op) {
+  const tipMap = { start: t('admin.kokoroStart'), stop: t('admin.kokoroStop'), restart: t('admin.kokoroRestart') }
+  if (op !== 'start') {
+    await ElMessageBox.confirm(t('admin.kokoroOpConfirm', { op: tipMap[op] }), t('admin.tip'), { type: 'warning' })
+  }
+  kokoroLoading.value = true
+  try {
+    const { data } = op === 'start' ? await adminApi.kokoroStart()
+      : op === 'stop' ? await adminApi.kokoroStop()
+      : await adminApi.kokoroRestart()
+    kokoro.value = data || {}
+    ElMessage.success(t('admin.kokoroOpOk', { op: tipMap[op] }))
+  } catch (e) {
+    ElMessage.error(t('admin.kokoroOpFail'))
+  } finally { kokoroLoading.value = false }
+}
 
 const parsedCount = computed(() => {
   try { return Array.isArray(JSON.parse(jsonText.value || '[]')) ? JSON.parse(jsonText.value).length : 0 }
@@ -601,7 +655,11 @@ onMounted(async () => {
   await reloadLessons()
   await loadTtsEngines()
   await loadTtsProviders()
+  await loadKokoro(true)
 })
+
+// 切到「语音服务」tab 时重新探测（页面停留期间服务可能被守护重启）
+watch(tab, (v) => { if (v === 'kokoro') loadKokoro(true) })
 </script>
 
 <style scoped>
